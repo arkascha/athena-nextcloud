@@ -2,10 +2,6 @@
 declare(strict_types=1);
 /** @var \OCP\IL10N $l */
 ?>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@500;700&family=DM+Sans:wght@400;500&family=Martian+Mono:wght@400;500&display=swap" rel="stylesheet">
-
 <style>
 /* ── Design tokens (dark monitoring theme) ─────────────────────────────── */
 #app {
@@ -32,9 +28,9 @@ declare(strict_types=1);
   --teal-dim:   rgba(52,211,153,.12);
   --grey:       #94A3B8;
   --grey-dim:   rgba(148,163,184,.12);
-  --fh: 'Syne', sans-serif;
-  --fb: 'DM Sans', var(--font-face, sans-serif);
-  --fm: 'Martian Mono', 'Courier New', monospace;
+  --fh: var(--font-face, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
+  --fb: var(--font-face, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
+  --fm: ui-monospace, 'Cascadia Code', 'Fira Code', 'Consolas', 'Courier New', monospace;
 }
 
 /* ── NC layout integration ─────────────────────────────────────────────── */
@@ -309,8 +305,8 @@ button { cursor: pointer; font-family: var(--fb); }
     <div id="athena-sb-head">
       <h2>Athena</h2>
       <div class="sb-actions">
-        <button class="btn btn-primary" style="flex:1" onclick="athena.openCreateClient()">+ Client</button>
-        <button class="btn btn-ghost"   style="flex:1" onclick="athena.openCreateSequence()">+ Sequence</button>
+        <button class="btn btn-primary" style="flex:1" id="btn-create-client">+ Client</button>
+        <button class="btn btn-ghost"   style="flex:1" id="btn-create-seq">+ Sequence</button>
       </div>
     </div>
     <div id="athena-client-list"></div>
@@ -360,8 +356,8 @@ button { cursor: pointer; font-family: var(--fb); }
             <div style="display:flex;align-items:center;gap:10px">
               <span class="card-head-right" id="ev-count"></span>
               <div class="ev-view-toggle">
-                <button class="evtb active" data-view="list"     onclick="athena.setEvView('list')">≡ List</button>
-                <button class="evtb"        data-view="timeline" onclick="athena.setEvView('timeline')">◈ Timeline</button>
+                <button class="evtb active" data-view="list">≡ List</button>
+                <button class="evtb"        data-view="timeline">◈ Timeline</button>
               </div>
             </div>
           </div>
@@ -399,10 +395,10 @@ button { cursor: pointer; font-family: var(--fb); }
       <label class="share-perm" style="margin:0">
         <input type="checkbox" id="share-can-edit"/> Allow editing
       </label>
-      <button class="btn btn-primary btn-sm" style="margin-left:auto" onclick="athena.addShare()">Add</button>
+      <button class="btn btn-primary btn-sm" style="margin-left:auto" id="share-add-btn">Add</button>
     </div>
     <div class="modal-actions" style="margin-top:10px">
-      <button class="btn btn-ghost" onclick="athena.closeModal('athena-modal-share')">Close</button>
+      <button class="btn btn-ghost" id="share-close-btn">Close</button>
     </div>
   </div>
 </div>
@@ -417,7 +413,7 @@ button { cursor: pointer; font-family: var(--fb); }
     <label>Assigned sequence</label>
     <select id="mc-seq"></select>
     <div class="modal-actions">
-      <button class="btn btn-ghost"   onclick="athena.closeModal('athena-modal-client')">Cancel</button>
+      <button class="btn btn-ghost"   id="mc-cancel">Cancel</button>
       <button class="btn btn-primary" id="mc-save">Save</button>
     </div>
   </div>
@@ -434,7 +430,7 @@ button { cursor: pointer; font-family: var(--fb); }
       Configure this as <code>Authorization: Bearer &lt;token&gt;</code> on the Kobo device.
     </div>
     <div class="modal-actions">
-      <button class="btn btn-primary" onclick="athena.closeModal('athena-modal-token')">Done</button>
+      <button class="btn btn-primary" id="token-done">Done</button>
     </div>
   </div>
 </div>
@@ -447,482 +443,8 @@ button { cursor: pointer; font-family: var(--fb); }
     <label>Abstract</label>
     <textarea id="ms-abstract" placeholder="Short description shown on the Kobo…"></textarea>
     <div class="modal-actions">
-      <button class="btn btn-ghost"   onclick="athena.closeModal('athena-modal-seq')">Cancel</button>
+      <button class="btn btn-ghost"   id="ms-cancel">Cancel</button>
       <button class="btn btn-primary" id="ms-save">Save</button>
     </div>
   </div>
 </div>
-
-<script>
-(function () {
-'use strict';
-
-const BASE   = OC.generateUrl('/apps/athena/api/v1/manage');
-const hdrs   = () => ({ 'Content-Type': 'application/json', 'requesttoken': OC.requestToken });
-const $      = id => document.getElementById(id);
-const esc    = s  => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-
-function relTime(iso) {
-  if (!iso) return 'never';
-  const s = Math.round((Date.now() - new Date(iso)) / 1000);
-  if (s < 5)    return 'just now';
-  if (s < 60)   return s + 's ago';
-  if (s < 3600) return Math.round(s / 60) + 'm ago';
-  return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-}
-function fmtTs(iso) {
-  if (!iso) return '—';
-  return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-}
-function hbStatus(ts) {
-  if (!ts) return 'never';
-  const s = (Date.now() - new Date(ts)) / 1000;
-  return s < 300 ? 'active' : s < 1800 ? 'idle' : 'offline';
-}
-function slotLabel(i) {
-  const h = Math.floor(i / 2), m = i % 2 ? '30' : '00';
-  return String(h).padStart(2, '0') + ':' + m;
-}
-
-/* ── State ──────────────────────────────────────────────────────────────── */
-let sequences = [], clients = [], activeId = null, refreshTimer = null, editingId = null, evView = 'list', lastEvents = [];
-let shareTarget = null; // {id, name} of client whose share modal is open
-let shareSearchResult = []; // autocomplete results
-
-/* ── Bootstrap ──────────────────────────────────────────────────────────── */
-async function init() {
-  await Promise.all([
-    fetch(BASE + '/sequences', { headers: hdrs() }).then(r => r.json()).then(d => sequences = d),
-    fetch(BASE + '/clients',   { headers: hdrs() }).then(r => r.json()).then(d => clients   = d),
-  ]);
-  renderSidebar();
-  if (clients.length) await selectClient(clients[0].id);
-}
-
-/* ── Sidebar ─────────────────────────────────────────────────────────────── */
-function renderSidebar() {
-  const el = $('athena-client-list');
-  el.innerHTML = '';
-  for (const c of clients) {
-    const status = hbStatus(c.last_heartbeat);
-    const seq    = sequences.find(s => s.id === c.sequence_id);
-    const div    = document.createElement('div');
-    div.className = 'client-card' + (activeId === c.id ? ' active' : '');
-    const sharedBadge = c.is_owner ? '' : `<span class="cc-shared-badge">${c.can_edit ? 'edit' : 'view'}</span>`;
-    div.innerHTML = `
-      <span class="hb ${status}" id="sb-hb-${c.id}"></span>
-      <div class="cc-info">
-        <div class="cc-name">${esc(c.name)}${sharedBadge}</div>
-        <div class="cc-sub">${esc(c.slug)} · ${esc(seq?.name ?? '—')}</div>
-      </div>
-      <span class="cc-caret">›</span>`;
-    div.onclick = () => selectClient(c.id);
-    el.appendChild(div);
-  }
-}
-
-/* ── Select + auto-refresh ───────────────────────────────────────────────── */
-async function selectClient(id) {
-  activeId = id;
-  clearTimeout(refreshTimer);
-  renderSidebar();
-  $('athena-placeholder').style.display = 'none';
-  $('athena-dashboard').style.display   = 'flex';
-  await Promise.all([renderMonitor(id), renderEvents(id)]);
-  refreshTimer = setTimeout(function tick() {
-    if (activeId !== id) return;
-    Promise.all([renderMonitor(id), renderEvents(id)])
-      .then(() => { refreshTimer = setTimeout(tick, 30000); });
-  }, 30000);
-}
-
-/* ── Monitor panel ────────────────────────────────────────────────────────── */
-async function renderMonitor(id) {
-  const r = await fetch(`${BASE}/clients/${id}/monitor`, { headers: hdrs() });
-  if (!r.ok) return;
-  const { client, today } = await r.json();
-
-  $('db-name').textContent     = client.name;
-  $('db-hb-dot').className     = 'hb ' + client.heartbeat_status;
-  $('db-hb-label').textContent = client.last_heartbeat
-    ? 'Last seen ' + relTime(client.last_heartbeat) : 'Never connected';
-
-  // Render action buttons according to permission tier
-  const acts = [];
-  if (client.can_edit)  acts.push(`<button class="btn btn-ghost btn-sm" onclick="athena.openEditClient()">Edit</button>`);
-  if (client.is_owner)  acts.push(`<button class="btn btn-ghost btn-sm" onclick="athena.doRotateToken()">Rotate token</button>`);
-  if (client.is_owner)  acts.push(`<button class="btn btn-ghost btn-sm" onclick="athena.openShare()">Share</button>`);
-  if (client.is_owner)  acts.push(`<button class="btn btn-danger btn-sm" onclick="athena.doDeleteClient()">Delete</button>`);
-  $('db-actions').innerHTML = acts.join('');
-
-  const { stats } = today;
-  $('db-stats').innerHTML = `
-    <div class="stat-pill blue">  <div class="sp-val">${stats.heartbeats}</div>  <div class="sp-label">Heartbeats</div></div>
-    <div class="stat-pill green"> <div class="sp-val">${stats.acknowledged}</div><div class="sp-label">Acknowledged</div></div>
-    <div class="stat-pill red">   <div class="sp-val">${stats.missed}</div>      <div class="sp-label">Missed</div></div>
-    <div class="stat-pill amber"> <div class="sp-val">${stats.alarms}</div>      <div class="sp-label">Alarms fired</div></div>`;
-
-  $('hb-slots').innerHTML = (today.hb_timeline ?? []).map((s, i) =>
-    `<div class="hb-slot s-${s}" title="${slotLabel(i)}: ${s}"></div>`
-  ).join('');
-  $('hb-updated').textContent = 'updated ' +
-    new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-
-  const stepCls  = { acknowledged: 'acked', missed: 'missed', pending: 'pending' };
-  const stepIcon = { acknowledged: '✅', missed: '❌', pending: '⏳' };
-  if (!today.steps.length) {
-    $('steps-list').innerHTML = '<div style="padding:14px;color:var(--atm);font-size:.8em;font-style:italic">No steps for today.</div>';
-  } else {
-    $('steps-list').innerHTML = today.steps.map(s => `
-      <div class="step-row">
-        <span class="step-time-badge">${esc(s.scheduled_time)}</span>
-        <span class="step-icon">${stepIcon[s.status] ?? '?'}</span>
-        <span class="step-name ${stepCls[s.status] ?? ''}">${esc(s.title)}</span>
-      </div>`).join('');
-  }
-
-  const sbDot = document.getElementById('sb-hb-' + id);
-  if (sbDot) sbDot.className = 'hb ' + client.heartbeat_status;
-}
-
-/* ── Event timeline ───────────────────────────────────────────────────────── */
-const evColors = {
-  heartbeat:         '#60A5FA',
-  step_acknowledged: '#4ADE80',
-  step_missed:       '#F87171',
-  alarm_escalated:   '#FBB040',
-  button_press:      '#C084FC',
-  sequence_loaded:   '#34D399',
-  config_changed:    '#94A3B8',
-};
-const evLanes     = Object.keys(evColors);
-const evLaneLabel = { heartbeat:'Heartbeat', step_acknowledged:'Ack\'d', step_missed:'Missed',
-  alarm_escalated:'Alarm', button_press:'Button', sequence_loaded:'Loaded', config_changed:'Config' };
-
-function buildTimelineSVG(events) {
-  const VW = 800, LANE_H = 30, LABEL_W = 80, PAD_T = 10, PAD_B = 26, R = 5;
-  const VH = PAD_T + evLanes.length * LANE_H + PAD_B;
-  const PLOT_W = VW - LABEL_W - 8;
-
-  const now  = Date.now();
-  const tMax = now;
-  const oldest = events.length ? new Date(events[events.length - 1].occurred_at).getTime() : now - 3600000;
-  const tMin = Math.min(oldest, now - 3600000);
-  const tRange = tMax - tMin || 1;
-
-  const xOf = t => LABEL_W + ((t - tMin) / tRange) * PLOT_W;
-
-  let gridLines = '';
-  const hourMs = 3600000;
-  let gt = Math.ceil(tMin / hourMs) * hourMs;
-  while (gt <= tMax) {
-    const x = xOf(gt).toFixed(1);
-    const lbl = new Date(gt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    gridLines += `<line x1="${x}" y1="${PAD_T}" x2="${x}" y2="${PAD_T + evLanes.length * LANE_H}" stroke="#242D45" stroke-width="1"/>`;
-    gridLines += `<text x="${x}" y="${VH - 4}" fill="#4D5D80" font-size="9" font-family="Martian Mono,monospace" text-anchor="middle">${lbl}</text>`;
-    gt += hourMs;
-  }
-
-  let lanesBg = '', labels = '';
-  evLanes.forEach((type, i) => {
-    const y  = PAD_T + i * LANE_H;
-    const bg = i % 2 === 0 ? '#121828' : '#0F1522';
-    lanesBg += `<rect x="${LABEL_W}" y="${y}" width="${PLOT_W}" height="${LANE_H}" fill="${bg}"/>`;
-    lanesBg += `<line x1="${LABEL_W}" y1="${y + LANE_H}" x2="${LABEL_W + PLOT_W}" y2="${y + LANE_H}" stroke="#242D45" stroke-width="1"/>`;
-    const col = evColors[type];
-    labels   += `<rect x="4" y="${y + LANE_H / 2 - 5}" width="8" height="8" rx="2" fill="${col}"/>`;
-    labels   += `<text x="17" y="${y + LANE_H / 2 + 4}" fill="#8A97B8" font-size="10" font-family="DM Sans,sans-serif">${evLaneLabel[type]}</text>`;
-  });
-
-  const nowX   = xOf(tMax).toFixed(1);
-  const nowLine = `<line x1="${nowX}" y1="${PAD_T}" x2="${nowX}" y2="${PAD_T + evLanes.length * LANE_H}" stroke="#3B4F70" stroke-width="1" stroke-dasharray="3,3"/>`;
-
-  let dots = '';
-  events.forEach(ev => {
-    const li = evLanes.indexOf(ev.event_type);
-    if (li < 0) return;
-    const x   = xOf(new Date(ev.occurred_at).getTime()).toFixed(1);
-    const y   = (PAD_T + li * LANE_H + LANE_H / 2).toFixed(1);
-    const col = evColors[ev.event_type] || '#94A3B8';
-    const meta = evMeta[ev.event_type] ?? { desc: () => ev.event_type };
-    const raw  = meta.desc(ev.payload ?? {}).replace(/<[^>]*>/g, '');
-    const ts   = new Date(ev.occurred_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    const tip  = (ts + '\n' + raw).replace(/"/g, '&quot;');
-    dots += `<circle cx="${x}" cy="${y}" r="${R}" fill="${col}" opacity=".85" class="ev-dot" data-tip="${tip}"/>`;
-  });
-
-  const svgEl = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svgEl.setAttribute('width', '100%');
-  svgEl.setAttribute('height', VH);
-  svgEl.setAttribute('viewBox', `0 0 ${VW} ${VH}`);
-  svgEl.setAttribute('preserveAspectRatio', 'none');
-  svgEl.innerHTML = lanesBg + gridLines + nowLine + labels + dots;
-
-  const tl = $('ev-timeline');
-  tl.innerHTML = '';
-  tl.appendChild(svgEl);
-
-  const tip = $('ev-tip');
-  tl.querySelectorAll('.ev-dot').forEach(dot => {
-    dot.style.cursor = 'pointer';
-    dot.addEventListener('mouseenter', () => { tip.textContent = dot.dataset.tip; tip.style.display = 'block'; });
-    dot.addEventListener('mousemove',  e  => { tip.style.left = (e.clientX + 14) + 'px'; tip.style.top = (e.clientY - 8) + 'px'; });
-    dot.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
-  });
-}
-
-function switchEvView(view) {
-  evView = view;
-  document.querySelectorAll('.evtb').forEach(b => b.classList.toggle('active', b.dataset.view === view));
-  $('ev-list').style.display     = view === 'list'     ? '' : 'none';
-  $('ev-timeline').style.display = view === 'timeline' ? '' : 'none';
-  if (view === 'timeline' && lastEvents.length) requestAnimationFrame(() => buildTimelineSVG(lastEvents));
-}
-
-/* ── Event stream ─────────────────────────────────────────────────────────── */
-const evMeta = {
-  heartbeat:         { label: 'hb',     cls: 'pill-hb',     desc: ()  => 'Client connected' },
-  step_acknowledged: { label: 'ack',    cls: 'pill-ack',    desc: p   => `Acknowledged: <strong>${esc(p.title ?? p.step_key)}</strong>` },
-  step_missed:       { label: 'missed', cls: 'pill-missed', desc: p   => `Missed: <strong>${esc(p.title ?? p.step_key)}</strong>` },
-  alarm_escalated:   { label: 'alarm',  cls: 'pill-alarm',  desc: p   => `Alarm level ${p.level ?? '?'} — <strong>${esc(p.title ?? p.step_key)}</strong>` },
-  button_press:      { label: 'btn',    cls: 'pill-btn',    desc: p   => `Button <strong>${esc(p.button)}</strong>${p.context ? ' (' + esc(p.context) + ')' : ''}` },
-  sequence_loaded:   { label: 'loaded', cls: 'pill-loaded', desc: p   => `Sequence loaded — <strong>${esc(String(p.step_count))} steps</strong>` },
-  config_changed:    { label: 'config', cls: 'pill-config', desc: p   => `Sequence reassigned by <strong>${esc(p.changed_by)}</strong>` },
-};
-
-async function renderEvents(id) {
-  const r = await fetch(`${BASE}/clients/${id}/events`, { headers: hdrs() });
-  if (!r.ok) return;
-  const events = await r.json();
-  lastEvents = events;
-  $('ev-count').textContent = events.length + ' events';
-
-  if (!events.length) {
-    $('ev-list').innerHTML     = '<div style="padding:16px;color:var(--atm);font-size:.8em;font-style:italic">No events yet.</div>';
-    $('ev-timeline').innerHTML = '';
-    return;
-  }
-  $('ev-list').innerHTML = events.map(ev => {
-    const meta = evMeta[ev.event_type] ?? { label: ev.event_type, cls: 'pill-config', desc: () => ev.event_type };
-    return `<div class="ev-row">
-      <span class="ev-time">${fmtTs(ev.occurred_at)}</span>
-      <span class="ev-pill ${meta.cls}">${meta.label}</span>
-      <span class="ev-desc">${meta.desc(ev.payload ?? {})}</span>
-    </div>`;
-  }).join('');
-  if (evView === 'timeline') requestAnimationFrame(() => buildTimelineSVG(events));
-}
-
-/* ── Client CRUD ──────────────────────────────────────────────────────────── */
-function populateSeqSel(sel) {
-  $('mc-seq').innerHTML = sequences
-    .map(s => `<option value="${s.id}"${s.id === sel ? ' selected' : ''}>${esc(s.name)}</option>`)
-    .join('');
-}
-
-async function reloadClients() {
-  clients = await fetch(BASE + '/clients', { headers: hdrs() }).then(r => r.json());
-}
-
-window.athena = {
-  openCreateClient() {
-    editingId = null;
-    $('mc-title').textContent = 'New client';
-    $('mc-name').value = ''; $('mc-slug').value = '';
-    populateSeqSel(null);
-    $('mc-save').onclick = async () => {
-      const p = { name: $('mc-name').value.trim(), slug: $('mc-slug').value.trim(), sequenceId: +$('mc-seq').value };
-      if (!p.name || !p.slug) { alert('Name and slug are required.'); return; }
-      const r = await fetch(BASE + '/clients', { method: 'POST', headers: hdrs(), body: JSON.stringify(p) });
-      const d = await r.json();
-      if (!r.ok) { alert(d.error ?? 'Error creating client'); return; }
-      this.closeModal('athena-modal-client');
-      this.showToken(d.token);
-      await reloadClients(); renderSidebar();
-    };
-    $('athena-modal-client').classList.add('open');
-  },
-
-  async openEditClient() {
-    if (!activeId) return;
-    editingId = activeId;
-    const c = clients.find(x => x.id === activeId); if (!c) return;
-    $('mc-title').textContent = 'Edit client';
-    $('mc-name').value = c.name; $('mc-slug').value = c.slug;
-
-    // Shared editors need the owner's sequences, not their own
-    let seqList = sequences;
-    if (!c.is_owner) {
-      const r = await fetch(`${BASE}/clients/${c.id}/sequences`, { headers: hdrs() });
-      if (r.ok) seqList = await r.json();
-    }
-    $('mc-seq').innerHTML = seqList
-      .map(s => `<option value="${s.id}"${s.id === c.sequence_id ? ' selected' : ''}>${esc(s.name)}</option>`)
-      .join('');
-
-    $('mc-save').onclick = async () => {
-      const p = { name: $('mc-name').value.trim(), slug: $('mc-slug').value.trim(), sequenceId: +$('mc-seq').value };
-      const r = await fetch(`${BASE}/clients/${editingId}`, { method: 'PUT', headers: hdrs(), body: JSON.stringify(p) });
-      if (!r.ok) { alert('Error updating client'); return; }
-      this.closeModal('athena-modal-client');
-      await reloadClients();
-      if (activeId === editingId) await renderMonitor(activeId);
-      renderSidebar();
-    };
-    $('athena-modal-client').classList.add('open');
-  },
-
-  async doDeleteClient() {
-    if (!activeId) return;
-    const c = clients.find(x => x.id === activeId);
-    if (!confirm(`Delete "${c?.name}"? This cannot be undone.`)) return;
-    await fetch(`${BASE}/clients/${activeId}`, { method: 'DELETE', headers: hdrs() });
-    clearTimeout(refreshTimer);
-    await reloadClients();
-    activeId = null;
-    $('athena-dashboard').style.display   = 'none';
-    $('athena-placeholder').style.display = '';
-    renderSidebar();
-    if (clients.length) await selectClient(clients[0].id);
-  },
-
-  async doRotateToken() {
-    if (!activeId) return;
-    const c = clients.find(x => x.id === activeId);
-    if (!confirm(`Rotate token for "${c?.name}"? The old token stops working immediately.`)) return;
-    const r = await fetch(`${BASE}/clients/${activeId}/token`, { method: 'POST', headers: hdrs() });
-    const d = await r.json();
-    if (!r.ok) { alert('Error rotating token'); return; }
-    this.showToken(d.token);
-  },
-
-  openCreateSequence() {
-    $('ms-name').value = ''; $('ms-abstract').value = '';
-    $('ms-save').onclick = async () => {
-      const p = { name: $('ms-name').value.trim(), abstract: $('ms-abstract').value.trim() };
-      if (!p.name) { alert('Name is required.'); return; }
-      const r = await fetch(BASE + '/sequences', { method: 'POST', headers: hdrs(), body: JSON.stringify(p) });
-      if (!r.ok) { alert('Error creating sequence'); return; }
-      this.closeModal('athena-modal-seq');
-      sequences = await fetch(BASE + '/sequences', { headers: hdrs() }).then(r => r.json());
-      renderSidebar();
-    };
-    $('athena-modal-seq').classList.add('open');
-  },
-
-  showToken(t) { $('token-val').textContent = t; $('athena-modal-token').classList.add('open'); },
-  closeModal(id) { $(id).classList.remove('open'); },
-  setEvView(view) { switchEvView(view); },
-
-  // ── Share management ────────────────────────────────────────────────────
-  async openShare() {
-    if (!activeId) return;
-    const c = clients.find(x => x.id === activeId); if (!c || !c.is_owner) return;
-    shareTarget = { id: c.id, name: c.name };
-    $('share-search').value = '';
-    $('share-can-edit').checked = false;
-    $('share-autocomplete').style.display = 'none';
-    shareSearchResult = [];
-    await this._refreshShareList();
-    $('athena-modal-share').classList.add('open');
-  },
-
-  async _refreshShareList() {
-    const r = await fetch(`${BASE}/clients/${shareTarget.id}/shares`, { headers: hdrs() });
-    if (!r.ok) return;
-    const shares = await r.json();
-    const wrap = $('share-list');
-    if (!shares.length) {
-      wrap.innerHTML = '<div style="color:var(--atm);font-size:.8em;font-style:italic;padding:8px 0">No shares yet.</div>';
-      return;
-    }
-    wrap.innerHTML = shares.map(s => `
-      <div class="share-row" id="sr-${s.id}">
-        <div class="share-user">
-          ${esc(s.shared_with_display)}
-          <small>${esc(s.shared_with_user_id)}</small>
-        </div>
-        <label class="share-perm">
-          <input type="checkbox" onchange="athena.toggleShareEdit(${s.id}, this.checked)"${s.can_edit ? ' checked' : ''}/>
-          Edit
-        </label>
-        <button class="btn btn-danger btn-sm" onclick="athena.removeShare(${s.id})">Remove</button>
-      </div>`).join('');
-  },
-
-  async addShare() {
-    const uid = $('share-search').dataset.selectedUid;
-    if (!uid) { alert('Select a user from the search results first.'); return; }
-    const canEdit = $('share-can-edit').checked;
-    const r = await fetch(`${BASE}/clients/${shareTarget.id}/shares`, {
-      method: 'POST', headers: hdrs(),
-      body: JSON.stringify({ shareWith: uid, canEdit }),
-    });
-    if (!r.ok) {
-      const d = await r.json().catch(() => ({}));
-      alert(d.message ?? 'Error creating share');
-      return;
-    }
-    $('share-search').value = '';
-    delete $('share-search').dataset.selectedUid;
-    $('share-can-edit').checked = false;
-    $('share-autocomplete').style.display = 'none';
-    await this._refreshShareList();
-  },
-
-  async toggleShareEdit(shareId, canEdit) {
-    await fetch(`${BASE}/clients/${shareTarget.id}/shares/${shareId}`, {
-      method: 'PUT', headers: hdrs(), body: JSON.stringify({ canEdit }),
-    });
-  },
-
-  async removeShare(shareId) {
-    await fetch(`${BASE}/clients/${shareTarget.id}/shares/${shareId}`, {
-      method: 'DELETE', headers: hdrs(),
-    });
-    await this._refreshShareList();
-  },
-};
-
-/* ── Close modals on backdrop click ──────────────────────────────────────── */
-document.querySelectorAll('.athena-modal-back').forEach(el =>
-  el.addEventListener('click', e => { if (e.target === el) el.classList.remove('open'); })
-);
-
-/* ── Share user-search autocomplete ─────────────────────────────────────── */
-let searchDebounce = null;
-$('share-search').addEventListener('input', () => {
-  clearTimeout(searchDebounce);
-  const q = $('share-search').value.trim();
-  delete $('share-search').dataset.selectedUid;
-  if (q.length < 2) { $('share-autocomplete').style.display = 'none'; return; }
-  searchDebounce = setTimeout(async () => {
-    const r = await fetch(`${BASE.replace('/manage', '')}/manage/users/search?q=` + encodeURIComponent(q), { headers: hdrs() });
-    if (!r.ok) return;
-    const users = await r.json();
-    shareSearchResult = users;
-    const ac = $('share-autocomplete');
-    if (!users.length) { ac.style.display = 'none'; return; }
-    ac.innerHTML = users.map((u, i) =>
-      `<div class="share-ac-item" data-idx="${i}">
-         ${esc(u.displayName)}<small>${esc(u.uid)}</small>
-       </div>`
-    ).join('');
-    ac.querySelectorAll('.share-ac-item').forEach(el => {
-      el.addEventListener('click', () => {
-        const u = shareSearchResult[+el.dataset.idx];
-        $('share-search').value = u.displayName + ' (' + u.uid + ')';
-        $('share-search').dataset.selectedUid = u.uid;
-        ac.style.display = 'none';
-      });
-    });
-    ac.style.display = 'block';
-  }, 300);
-});
-document.addEventListener('click', e => {
-  if (!$('share-search-wrap').contains(e.target)) $('share-autocomplete').style.display = 'none';
-});
-
-init();
-}());
-</script>
