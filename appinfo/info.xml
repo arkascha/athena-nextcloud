@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<info xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:noNamespaceSchemaLocation="https://apps.nextcloud.com/schema/apps/info.xsd">
+    <id>athena</id>
+    <name>Athena</name>
+    <description lang="en">Kobo e-reader sequence management and client monitoring</description>
+    <version>0.1.0</version>
+    <licence>AGPL-3.0-or-later</licence>
+    <author mail="claude@christian-reiner.info">Christian Reiner</author>
+    <bugs>https://github.com/arkascha/athena/issues</bugs>
+    <dependencies>
+        <php min-version="8.1"/>
+        <nextcloud min-version="27" max-version="30"/>
+    </dependencies>
+    <navigation>
+        <name>Athena</name>
+        <route>athena.page.index</route>
+        <icon>app.svg</icon>
+        <order>10</order>
+    </navigation>
+</info>

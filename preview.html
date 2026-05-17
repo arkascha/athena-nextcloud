@@ -1,0 +1,1086 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Athena Monitor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@500;700&family=DM+Sans:ital,wght@0,400;0,500;1,400&family=Martian+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ── Design tokens ─────────────────────────────────────────────────────── */
+:root {
+  --bg:         #0B0F1A;
+  --surface:    #121828;
+  --surface-2:  #1A2035;
+  --surface-3:  #212840;
+  --border:     #242D45;
+  --border-2:   #2E3855;
+  --text:       #D4DCF0;
+  --text-dim:   #8A97B8;
+  --text-muted: #4D5D80;
+
+  --green:      #4ADE80;
+  --green-dim:  rgba(74,222,128,.12);
+  --amber:      #FBB040;
+  --amber-dim:  rgba(251,176,64,.12);
+  --red:        #F87171;
+  --red-dim:    rgba(248,113,113,.12);
+  --blue:       #60A5FA;
+  --blue-dim:   rgba(96,165,250,.12);
+  --purple:     #C084FC;
+  --purple-dim: rgba(192,132,252,.12);
+  --teal:       #34D399;
+  --teal-dim:   rgba(52,211,153,.12);
+  --grey:       #94A3B8;
+  --grey-dim:   rgba(148,163,184,.12);
+
+  --primary:    #60A5FA;
+  --font-head:  'Syne', sans-serif;
+  --font-body:  'DM Sans', sans-serif;
+  --font-mono:  'Martian Mono', monospace;
+
+  /* NC variable fallbacks */
+  --color-main-background: var(--surface);
+  --color-primary: var(--blue);
+  --color-border:  var(--border);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font-body); font-size: 14px; }
+
+/* ── NC mock bar ───────────────────────────────────────────────────────── */
+#nc-bar {
+  height: 44px; background: #0A1628;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; padding: 0 18px; gap: 10px;
+  flex-shrink: 0;
+}
+#nc-bar .logo { font-family: var(--font-head); font-size: 1em; font-weight: 700; color: var(--blue); letter-spacing: .04em; }
+#nc-bar .sep  { color: var(--border-2); }
+#nc-bar .app  { color: var(--text-dim); font-size: .85em; }
+#nc-bar .tag  { margin-left: auto; font-size: .7em; color: var(--text-muted); font-family: var(--font-mono); background: var(--surface-3); padding: 3px 8px; border-radius: 3px; }
+
+/* ── App shell ─────────────────────────────────────────────────────────── */
+#app { display: flex; height: calc(100vh - 44px); overflow: hidden; }
+
+/* ── Sidebar ───────────────────────────────────────────────────────────── */
+#sidebar {
+  width: 256px; min-width: 220px; flex-shrink: 0;
+  background: var(--surface); border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+#sidebar-head {
+  padding: 14px 14px 10px;
+  border-bottom: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 8px;
+}
+#sidebar-head h2 { font-family: var(--font-head); font-size: .95em; font-weight: 700; color: var(--text); letter-spacing: .05em; text-transform: uppercase; }
+.sb-actions { display: flex; gap: 6px; }
+#client-list { flex: 1; overflow-y: auto; padding: 6px 0; }
+
+.client-card {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; cursor: pointer;
+  border-left: 3px solid transparent;
+  transition: background .15s, border-color .15s;
+}
+.client-card:hover   { background: var(--surface-2); }
+.client-card.active  { background: var(--surface-3); border-left-color: var(--primary); }
+.client-card .cc-info { flex: 1; min-width: 0; }
+.client-card .cc-name { font-weight: 500; font-size: .88em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.client-card .cc-sub  { font-size: .72em; color: var(--text-muted); font-family: var(--font-mono); margin-top: 2px; }
+.client-card .cc-caret { color: var(--text-muted); font-size: .8em; opacity: .5; }
+
+/* ── Heartbeat dot ─────────────────────────────────────────────────────── */
+.hb { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.hb.active  { background: var(--green);  box-shadow: 0 0 6px var(--green); }
+.hb.idle    { background: var(--amber); }
+.hb.offline { background: var(--red); }
+.hb.never   { background: var(--text-muted); }
+
+/* ── Main panel ────────────────────────────────────────────────────────── */
+#main { flex: 1; overflow-y: auto; display: flex; flex-direction: column; min-width: 0; }
+#placeholder { flex: 1; display: flex; align-items: center; justify-content: center;
+  color: var(--text-muted); font-size: .88em; font-style: italic; }
+
+/* ── Dashboard ─────────────────────────────────────────────────────────── */
+#dashboard { display: none; flex-direction: column; padding: 20px 24px; gap: 18px; }
+
+/* Header */
+#db-header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+#db-header h2 { font-family: var(--font-head); font-size: 1.35em; font-weight: 700; flex: 1; min-width: 0; }
+#db-header .hb-label { font-size: .78em; color: var(--text-dim); font-family: var(--font-mono); }
+.hdr-actions { display: flex; gap: 6px; }
+
+/* Stat pills */
+#db-stats { display: flex; gap: 10px; flex-wrap: wrap; }
+.stat-pill {
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 6px; padding: 8px 14px; min-width: 100px;
+}
+.stat-pill .sp-val  { font-family: var(--font-mono); font-size: 1.4em; font-weight: 500; line-height: 1; }
+.stat-pill .sp-label{ font-size: .7em; color: var(--text-muted); margin-top: 4px; text-transform: uppercase; letter-spacing: .06em; }
+.stat-pill.green .sp-val { color: var(--green); }
+.stat-pill.red   .sp-val { color: var(--red); }
+.stat-pill.amber .sp-val { color: var(--amber); }
+.stat-pill.blue  .sp-val { color: var(--blue); }
+
+/* ── Heartbeat timeline ────────────────────────────────────────────────── */
+#hb-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 14px 16px;
+}
+#hb-card .card-title {
+  font-family: var(--font-head); font-size: .78em; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .08em; color: var(--text-muted);
+  margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;
+}
+#hb-card .card-title span { font-family: var(--font-mono); font-size: .85em; color: var(--text-dim); text-transform: none; letter-spacing: 0; font-weight: 400; }
+#hb-slots { display: flex; gap: 2px; align-items: flex-end; }
+.hb-slot {
+  flex: 1; height: 20px; border-radius: 3px;
+  transition: transform .1s;
+  position: relative; cursor: default;
+}
+.hb-slot:hover { transform: scaleY(1.3); z-index: 1; }
+.hb-slot.s-active   { background: var(--green); opacity: .85; }
+.hb-slot.s-missed   { background: var(--red);   opacity: .6; }
+.hb-slot.s-inactive { background: var(--surface-3); }
+.hb-slot.s-future   { background: var(--surface-2); }
+#hb-labels {
+  display: flex; justify-content: space-between;
+  margin-top: 6px; font-family: var(--font-mono);
+  font-size: .65em; color: var(--text-muted);
+}
+.hb-legend { display: flex; gap: 14px; margin-top: 10px; }
+.hb-legend-item { display: flex; align-items: center; gap: 5px; font-size: .72em; color: var(--text-muted); }
+.hb-legend-dot  { width: 10px; height: 10px; border-radius: 2px; }
+
+/* ── Two-column layout: events + steps ────────────────────────────────── */
+#db-columns { display: grid; grid-template-columns: 1fr 300px; gap: 16px; }
+
+/* Event stream */
+#ev-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; overflow: hidden; display: flex; flex-direction: column;
+}
+.card-head {
+  padding: 10px 14px; border-bottom: 1px solid var(--border);
+  font-family: var(--font-head); font-size: .78em; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .08em; color: var(--text-muted);
+  display: flex; align-items: center; justify-content: space-between;
+}
+#ev-list { overflow-y: auto; max-height: 440px; }
+.ev-row {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 8px 14px; border-bottom: 1px solid var(--border-2);
+  transition: background .1s;
+}
+.ev-row:last-child { border-bottom: none; }
+.ev-row:hover { background: var(--surface-2); }
+.ev-time {
+  font-family: var(--font-mono); font-size: .7em; color: var(--text-muted);
+  min-width: 52px; padding-top: 2px; white-space: nowrap;
+}
+.ev-pill {
+  font-size: .65em; font-weight: 500; padding: 2px 6px;
+  border-radius: 3px; white-space: nowrap; font-family: var(--font-mono);
+  flex-shrink: 0;
+}
+.ev-desc { font-size: .82em; color: var(--text-dim); line-height: 1.4; min-width: 0; }
+.ev-desc strong { color: var(--text); font-weight: 500; }
+
+/* pill variants */
+.pill-hb      { color: var(--blue);   background: var(--blue-dim); }
+.pill-ack     { color: var(--green);  background: var(--green-dim); }
+.pill-missed  { color: var(--red);    background: var(--red-dim); }
+.pill-alarm   { color: var(--amber);  background: var(--amber-dim); }
+.pill-btn     { color: var(--purple); background: var(--purple-dim); }
+.pill-loaded  { color: var(--teal);   background: var(--teal-dim); }
+.pill-config  { color: var(--grey);   background: var(--grey-dim); }
+
+/* ── Shared badge ──────────────────────────────────────────────────────── */
+.cc-shared-badge { font-size:.58em; color:#60A5FA; background:rgba(96,165,250,.12); border-radius:3px; padding:1px 4px; margin-left:4px; vertical-align:middle; font-family:var(--font-mono); letter-spacing:0; text-transform:none; font-weight:500; flex-shrink:0; }
+
+/* ── Share modal ───────────────────────────────────────────────────────── */
+.share-row { display:flex; align-items:center; gap:8px; padding:8px 0; border-bottom:1px solid var(--border-2); }
+.share-row:last-child { border-bottom:none; }
+.share-user { flex:1; min-width:0; font-size:.82em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.share-user small { display:block; font-size:.8em; color:var(--text-muted); font-family:var(--font-mono); }
+.share-perm { display:flex; align-items:center; gap:5px; font-size:.75em; color:var(--text-muted); white-space:nowrap; flex-shrink:0; }
+.share-perm input[type=checkbox] { accent-color:#60A5FA; width:14px; height:14px; cursor:pointer; }
+#share-list-wrap { max-height:200px; overflow-y:auto; margin-bottom:10px; }
+#share-search-wrap { position:relative; }
+#share-search { width:100%; background:var(--surface-2); border:1px solid var(--border-2); border-radius:5px; padding:7px 10px; font-size:.85em; color:var(--text); font-family:var(--font-body); outline:none; box-sizing:border-box; }
+#share-search:focus { border-color:#60A5FA; }
+#share-autocomplete { position:absolute; top:calc(100% + 3px); left:0; right:0; z-index:100; background:var(--surface-2); border:1px solid var(--border-2); border-radius:5px; box-shadow:0 6px 20px rgba(0,0,0,.5); overflow:hidden; display:none; }
+.share-ac-item { padding:8px 12px; cursor:pointer; font-size:.83em; display:flex; flex-direction:column; gap:1px; }
+.share-ac-item:hover { background:var(--surface-3); }
+.share-ac-item small { color:var(--text-muted); font-family:var(--font-mono); font-size:.85em; }
+.share-add-row { display:flex; gap:8px; align-items:center; margin-top:10px; }
+
+/* ── Event view toggle ─────────────────────────────────────────────────── */
+.ev-view-toggle { display:flex; border:1px solid #2E3855; border-radius:5px; overflow:hidden; flex-shrink:0; }
+.evtb { background:transparent; color:#4D5D80; border:none; border-right:1px solid #2E3855; padding:3px 10px; font-size:.7em; cursor:pointer; white-space:nowrap; }
+.evtb:last-child { border-right:none; }
+.evtb:hover, .evtb.active { background:#212840; color:#D4DCF0; }
+#ev-timeline { overflow-x:hidden; padding:12px 4px; }
+#ev-timeline svg { display:block; }
+#ev-tip { position:fixed; z-index:9999; pointer-events:none; background:#1A2035; border:1px solid #2E3855; border-radius:5px; padding:6px 10px; font-family:'Martian Mono',monospace; font-size:.72em; color:#D4DCF0; box-shadow:0 4px 16px rgba(0,0,0,.5); display:none; max-width:280px; line-height:1.5; white-space:pre-line; }
+
+/* Steps list */
+#steps-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; overflow: hidden; display: flex; flex-direction: column;
+  align-self: start;
+}
+.step-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 14px; border-bottom: 1px solid var(--border-2);
+}
+.step-row:last-child { border-bottom: none; }
+.step-time-badge {
+  font-family: var(--font-mono); font-size: .65em; color: var(--text-muted);
+  background: var(--surface-3); padding: 2px 5px; border-radius: 3px;
+  white-space: nowrap; flex-shrink: 0;
+}
+.step-icon  { font-size: .95em; flex-shrink: 0; width: 18px; text-align: center; }
+.step-name  { flex: 1; font-size: .82em; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.step-name.acked  { color: var(--green); }
+.step-name.missed { color: var(--red); text-decoration: line-through; opacity: .8; }
+.step-name.pending{ color: var(--text-dim); }
+
+/* ── Buttons ───────────────────────────────────────────────────────────── */
+button { cursor: pointer; font-family: var(--font-body); }
+.btn { border: none; border-radius: 5px; padding: 6px 13px; font-size: .8em; font-weight: 500; }
+.btn-primary { background: var(--blue); color: #0B0F1A; }
+.btn-primary:hover { filter: brightness(1.1); }
+.btn-ghost   { background: var(--surface-3); color: var(--text-dim); border: 1px solid var(--border-2); }
+.btn-ghost:hover { background: var(--surface-2); color: var(--text); }
+.btn-danger  { background: var(--red-dim); color: var(--red); border: 1px solid rgba(248,113,113,.25); }
+.btn-danger:hover { background: rgba(248,113,113,.2); }
+.btn-sm { padding: 4px 10px; font-size: .75em; }
+
+/* ── Modals ────────────────────────────────────────────────────────────── */
+.modal-back {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,.65); z-index: 9000;
+  align-items: center; justify-content: center;
+}
+.modal-back.open { display: flex; }
+.modal {
+  background: var(--surface); border: 1px solid var(--border-2);
+  border-radius: 10px; padding: 24px; width: 460px; max-width: 95vw;
+  box-shadow: 0 20px 60px rgba(0,0,0,.6);
+}
+.modal h3 { font-family: var(--font-head); font-size: 1em; font-weight: 700; margin-bottom: 14px; color: var(--text); }
+.modal label { display: block; font-size: .75em; color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; margin: 12px 0 5px; }
+.modal input, .modal select, .modal textarea {
+  width: 100%; background: var(--surface-2); border: 1px solid var(--border-2);
+  border-radius: 5px; padding: 7px 10px; font-size: .85em; color: var(--text);
+  font-family: var(--font-body); outline: none;
+}
+.modal input:focus, .modal select:focus, .modal textarea:focus {
+  border-color: var(--blue); box-shadow: 0 0 0 2px rgba(96,165,250,.15);
+}
+.modal textarea { min-height: 72px; resize: vertical; }
+.modal select option { background: var(--surface-2); }
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; }
+.note {
+  background: rgba(251,176,64,.08); border: 1px solid rgba(251,176,64,.2);
+  border-radius: 5px; padding: 8px 12px; font-size: .75em; color: var(--amber);
+  margin-top: 12px; line-height: 1.5;
+}
+.token-box {
+  background: var(--surface-2); border: 1px dashed var(--border-2); border-radius: 5px;
+  padding: 10px 12px; font-family: var(--font-mono); font-size: .78em;
+  word-break: break-all; color: var(--green); margin-top: 10px; line-height: 1.6;
+}
+</style>
+</head>
+<body>
+
+<div id="nc-bar">
+  <span class="logo">▲ Nextcloud</span>
+  <span class="sep">›</span>
+  <span class="app">Athena</span>
+  <span class="tag">ui preview · mock data</span>
+</div>
+
+<div id="app">
+  <!-- ── Sidebar ─────────────────────────────────────────────────────── -->
+  <div id="sidebar">
+    <div id="sidebar-head">
+      <h2>Clients</h2>
+      <div class="sb-actions">
+        <button class="btn btn-primary" style="flex:1" onclick="openCreateClient()">+ Client</button>
+        <button class="btn btn-ghost"   style="flex:1" onclick="openCreateSequence()">+ Sequence</button>
+      </div>
+    </div>
+    <div id="client-list"></div>
+  </div>
+
+  <!-- ── Main ───────────────────────────────────────────────────────── -->
+  <div id="main">
+    <div id="placeholder">← select a client</div>
+
+    <div id="dashboard">
+      <!-- Header -->
+      <div id="db-header">
+        <span class="hb" id="db-hb-dot"></span>
+        <h2 id="db-name"></h2>
+        <span class="hb-label" id="db-hb-label"></span>
+        <div class="hdr-actions" id="db-actions"></div>
+      </div>
+
+      <!-- Stat pills -->
+      <div id="db-stats"></div>
+
+      <!-- Heartbeat timeline -->
+      <div id="hb-card">
+        <div class="card-title">
+          Heartbeat — last 24 h
+          <span id="hb-refresh"></span>
+        </div>
+        <div id="hb-slots"></div>
+        <div id="hb-labels">
+          <span>00:00</span><span>04:00</span><span>08:00</span>
+          <span>12:00</span><span>16:00</span><span>20:00</span><span>24:00</span>
+        </div>
+        <div class="hb-legend">
+          <div class="hb-legend-item"><div class="hb-legend-dot" style="background:var(--green)"></div>heartbeat received</div>
+          <div class="hb-legend-item"><div class="hb-legend-dot" style="background:var(--red);opacity:.6"></div>no heartbeat (gap)</div>
+          <div class="hb-legend-item"><div class="hb-legend-dot" style="background:var(--surface-3)"></div>inactive / future</div>
+        </div>
+      </div>
+
+      <!-- Event stream + steps -->
+      <div id="db-columns">
+        <div id="ev-card">
+          <div class="card-head">
+            Event stream
+            <div style="display:flex;align-items:center;gap:10px">
+              <span style="font-family:var(--font-mono);font-size:.85em;color:var(--text-muted);font-weight:400;text-transform:none;letter-spacing:0" id="ev-count"></span>
+              <div class="ev-view-toggle">
+                <button class="evtb active" data-view="list"     onclick="setEvView('list')">≡ List</button>
+                <button class="evtb"        data-view="timeline" onclick="setEvView('timeline')">◈ Timeline</button>
+              </div>
+            </div>
+          </div>
+          <div id="ev-list"></div>
+          <div id="ev-timeline" style="display:none"></div>
+        </div>
+
+        <div id="steps-card">
+          <div class="card-head">Today's steps</div>
+          <div id="steps-list"></div>
+        </div>
+      </div>
+
+      <div style="height:8px"></div>
+    </div>
+  </div>
+</div>
+
+<div id="ev-tip"></div>
+
+<!-- ── Modal: share ──────────────────────────────────────────────────── -->
+<div class="modal-back" id="modal-share">
+  <div class="modal" style="width:500px">
+    <h3>Share client</h3>
+    <div id="share-list-wrap"><div id="share-list"></div></div>
+    <label style="margin-top:4px">Add user</label>
+    <div id="share-search-wrap">
+      <input id="share-search" placeholder="Search by name or username…" autocomplete="off"/>
+      <div id="share-autocomplete"></div>
+    </div>
+    <div class="share-add-row">
+      <label class="share-perm" style="margin:0">
+        <input type="checkbox" id="share-can-edit"/> Allow editing
+      </label>
+      <button class="btn btn-primary btn-sm" style="margin-left:auto" onclick="addShare()">Add</button>
+    </div>
+    <div class="modal-actions" style="margin-top:10px">
+      <button class="btn btn-ghost" onclick="closeModal('modal-share')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: create/edit client ──────────────────────────────────────── -->
+<div class="modal-back" id="modal-client">
+  <div class="modal">
+    <h3 id="mc-title">New client</h3>
+    <label>Name</label><input id="mc-name" placeholder="Maria's Kobo"/>
+    <label>Slug <small style="text-transform:none;font-weight:400">(lowercase, digits, hyphens)</small></label>
+    <input id="mc-slug" placeholder="maria" style="font-family:var(--font-mono)"/>
+    <label>Assigned sequence</label><select id="mc-seq"></select>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-client')">Cancel</button>
+      <button class="btn btn-primary" id="mc-save">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: token display ───────────────────────────────────────────── -->
+<div class="modal-back" id="modal-token">
+  <div class="modal">
+    <h3>Bearer token</h3>
+    <p style="font-size:.82em;color:var(--text-dim);line-height:1.5">Copy this token now — it is shown only once and will not be stored in plaintext.</p>
+    <div class="token-box" id="token-val"></div>
+    <div class="note">Configure this value as the <code>Authorization: Bearer &lt;token&gt;</code> header on the Kobo device.</div>
+    <div class="modal-actions"><button class="btn btn-primary" onclick="closeModal('modal-token')">Done</button></div>
+  </div>
+</div>
+
+<!-- ── Modal: create sequence ─────────────────────────────────────────── -->
+<div class="modal-back" id="modal-seq">
+  <div class="modal">
+    <h3>New sequence</h3>
+    <label>Name / slug</label><input id="ms-name" placeholder="daily-routine" style="font-family:var(--font-mono)"/>
+    <label>Abstract</label><textarea id="ms-abstract" placeholder="Short description shown on the Kobo…"></textarea>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-seq')">Cancel</button>
+      <button class="btn btn-primary" id="ms-save">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+'use strict';
+
+/* ── Nextcloud stubs ───────────────────────────────────────────────────── */
+const OC = { generateUrl: p => p, requestToken: 'mock-csrf' };
+
+/* ── Helpers ───────────────────────────────────────────────────────────── */
+const $ = id => document.getElementById(id);
+const esc = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+function relTime(iso) {
+  if (!iso) return 'never';
+  const s = Math.round((Date.now() - new Date(iso)) / 1000);
+  if (s < 5)    return 'just now';
+  if (s < 60)   return s + 's ago';
+  if (s < 3600) return Math.round(s/60) + 'm ago';
+  return new Date(iso).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+}
+function fmtTs(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+}
+
+/* ── Mock data ─────────────────────────────────────────────────────────── */
+const now  = new Date();
+const ago  = m => new Date(now - m*60000).toISOString();
+const hm   = (h,m) => { const d=new Date(now); d.setHours(h,m,0,0); return d.toISOString(); };
+
+let mockSequences = [
+  { id:1, name:'daily-routine',   abstract:'Standard daily care routine for independent living support.' },
+  { id:2, name:'post-surgery',    abstract:'Post-surgery recovery — gentle activity with medication reminders.' },
+];
+
+let mockClients = [
+  { id:1, slug:'maria',  name:"Maria's Kobo",  sequence_id:1, last_heartbeat: ago(2),  owner_user_id:'admin', is_owner:true,  can_edit:true  },
+  { id:2, slug:'john',   name:"John's Kobo",   sequence_id:1, last_heartbeat: ago(18), owner_user_id:'admin', is_owner:true,  can_edit:true  },
+  { id:3, slug:'sarah',  name:"Sarah's Kobo",  sequence_id:2, last_heartbeat: null,    owner_user_id:'admin', is_owner:false, can_edit:false },
+];
+
+let mockShares = {
+  1: [{ id:1, client_id:1, shared_with_user_id:'nurse01', shared_with_display:'Nurse Anna', can_edit:true,  created_at: ago(120) }],
+  2: [],
+  3: [],
+};
+
+const mockUsers = [
+  { uid:'nurse01', displayName:'Nurse Anna' },
+  { uid:'nurse02', displayName:'Nurse Bob' },
+  { uid:'dr.smith', displayName:'Dr Smith' },
+];
+
+// 48-slot heartbeat timeline for Maria (slots = 30-min intervals from 00:00)
+// Status: 'active' | 'missed' | 'inactive' | 'future'
+function buildTimeline(clientId) {
+  const cur = Math.floor((now.getHours()*60 + now.getMinutes()) / 30);
+  const bases = {
+    1: { active:[16,17,18,19, 21,22,23,24,25, 32,33], missed:[20], inactive:[...Array(16).keys(),...[26,27,28,29,30,31]] },
+    2: { active:[16,17,18,19,20,21,22,23,24],          missed:[],   inactive:[...Array(16).keys(),...[25,26,27,28,29,30,31,32,33]] },
+    3: { active:[], missed:[], inactive:[...Array(34).keys()] },
+  };
+  const def = bases[clientId] ?? { active:[], missed:[], inactive:[] };
+  return Array.from({length:48}, (_,i) => {
+    if (i > cur) return 'future';
+    if (def.active.includes(i))   return 'active';
+    if (def.missed.includes(i))   return 'missed';
+    return 'inactive';
+  });
+}
+
+const mockMonitor = {
+  1: {
+    client: {
+      id:1, slug:'maria', name:"Maria's Kobo",
+      sequence_id:1, sequence_name:'daily-routine',
+      last_heartbeat: ago(2), heartbeat_status:'active',
+      owner_user_id:'admin', is_owner:true, can_edit:true,
+    },
+    today: {
+      date: now.toISOString().slice(0,10),
+      stats: { heartbeats:28, acknowledged:4, missed:1, alarms:4 },
+      hb_timeline: buildTimeline(1),
+      steps: [
+        { id:101, step_key:'step-001', title:'Take morning medication', scheduled_time:'08:00', status:'acknowledged', acknowledged_at: hm(8,9),  missed_at:null },
+        { id:102, step_key:'step-002', title:'Eat breakfast',           scheduled_time:'08:30', status:'acknowledged', acknowledged_at: hm(8,48), missed_at:null },
+        { id:103, step_key:'step-003', title:'Morning walk',            scheduled_time:'10:00', status:'missed',       acknowledged_at:null, missed_at: hm(10,34) },
+        { id:104, step_key:'step-004', title:'Lunch',                   scheduled_time:'12:30', status:'acknowledged', acknowledged_at: hm(12,48), missed_at:null },
+        { id:105, step_key:'step-005', title:'Take midday medication',  scheduled_time:'13:00', status:'acknowledged', acknowledged_at: hm(13,5),  missed_at:null },
+      ],
+    },
+  },
+  2: {
+    client: {
+      id:2, slug:'john', name:"John's Kobo",
+      sequence_id:1, sequence_name:'daily-routine',
+      last_heartbeat: ago(18), heartbeat_status:'idle',
+      owner_user_id:'admin', is_owner:true, can_edit:true,
+    },
+    today: {
+      date: now.toISOString().slice(0,10),
+      stats: { heartbeats:19, acknowledged:2, missed:0, alarms:1 },
+      hb_timeline: buildTimeline(2),
+      steps: [
+        { id:201, step_key:'step-001', title:'Take morning medication', scheduled_time:'08:00', status:'acknowledged', acknowledged_at: hm(8,6),  missed_at:null },
+        { id:202, step_key:'step-002', title:'Eat breakfast',           scheduled_time:'08:30', status:'acknowledged', acknowledged_at: hm(8,52), missed_at:null },
+        { id:203, step_key:'step-003', title:'Morning walk',            scheduled_time:'10:00', status:'pending',      acknowledged_at:null, missed_at:null },
+        { id:204, step_key:'step-004', title:'Lunch',                   scheduled_time:'12:30', status:'pending',      acknowledged_at:null, missed_at:null },
+        { id:205, step_key:'step-005', title:'Take midday medication',  scheduled_time:'13:00', status:'pending',      acknowledged_at:null, missed_at:null },
+      ],
+    },
+  },
+  3: {
+    client: {
+      id:3, slug:'sarah', name:"Sarah's Kobo",
+      sequence_id:2, sequence_name:'post-surgery',
+      last_heartbeat: null, heartbeat_status:'never',
+      owner_user_id:'admin', is_owner:false, can_edit:false,
+    },
+    today: {
+      date: now.toISOString().slice(0,10),
+      stats: { heartbeats:0, acknowledged:0, missed:0, alarms:0 },
+      hb_timeline: buildTimeline(3),
+      steps: [],
+    },
+  },
+};
+
+// Event stream per client (newest first)
+const mockEvents = {
+  1: [
+    { id:141, event_type:'heartbeat',         payload:{},                                           occurred_at: ago(2)    },
+    { id:140, event_type:'heartbeat',         payload:{},                                           occurred_at: ago(17)   },
+    { id:139, event_type:'heartbeat',         payload:{},                                           occurred_at: ago(32)   },
+    { id:138, event_type:'heartbeat',         payload:{},                                           occurred_at: ago(47)   },
+    { id:137, event_type:'step_acknowledged', payload:{step_key:'step-005',title:'Take midday medication'}, occurred_at: hm(13,5)  },
+    { id:136, event_type:'heartbeat',         payload:{},                                           occurred_at: hm(13,1)  },
+    { id:135, event_type:'step_acknowledged', payload:{step_key:'step-004',title:'Lunch'},          occurred_at: hm(12,48) },
+    { id:134, event_type:'sequence_loaded',   payload:{step_count:5,date:now.toISOString().slice(0,10)}, occurred_at: hm(12,31) },
+    { id:133, event_type:'heartbeat',         payload:{},                                           occurred_at: hm(12,31) },
+    { id:132, event_type:'heartbeat',         payload:{},                                           occurred_at: hm(12,1)  },
+    { id:131, event_type:'heartbeat',         payload:{},                                           occurred_at: hm(11,31) },
+    { id:130, event_type:'heartbeat',         payload:{},                                           occurred_at: hm(11,1)  },
+    { id:129, event_type:'heartbeat',         payload:{},                                           occurred_at: hm(10,46) },
+    { id:128, event_type:'button_press',      payload:{button:'next',context:'step_view'},          occurred_at: hm(10,37) },
+    { id:127, event_type:'step_missed',       payload:{step_key:'step-003',title:'Morning walk'},   occurred_at: hm(10,34) },
+    { id:126, event_type:'alarm_escalated',   payload:{step_key:'step-003',title:'Morning walk',level:3}, occurred_at: hm(10,32) },
+    { id:125, event_type:'alarm_escalated',   payload:{step_key:'step-003',title:'Morning walk',level:2}, occurred_at: hm(10,17) },
+    { id:124, event_type:'alarm_escalated',   payload:{step_key:'step-003',title:'Morning walk',level:1}, occurred_at: hm(10,10) },
+    { id:123, event_type:'heartbeat',         payload:{},                                           occurred_at: hm(10,2)  },
+    { id:122, event_type:'heartbeat',         payload:{},                                           occurred_at: hm(9,32)  },
+    { id:121, event_type:'button_press',      payload:{button:'next',context:'step_view'},          occurred_at: hm(9,12)  },
+    { id:120, event_type:'heartbeat',         payload:{},                                           occurred_at: hm(9,2)   },
+    { id:119, event_type:'step_acknowledged', payload:{step_key:'step-002',title:'Eat breakfast'},  occurred_at: hm(8,48)  },
+    { id:118, event_type:'alarm_escalated',   payload:{step_key:'step-002',title:'Eat breakfast',level:1}, occurred_at: hm(8,22) },
+    { id:117, event_type:'heartbeat',         payload:{},                                           occurred_at: hm(8,17)  },
+    { id:116, event_type:'step_acknowledged', payload:{step_key:'step-001',title:'Take morning medication'}, occurred_at: hm(8,9) },
+    { id:115, event_type:'button_press',      payload:{button:'power',context:'wake'},              occurred_at: hm(8,7)   },
+    { id:114, event_type:'heartbeat',         payload:{},                                           occurred_at: hm(8,2)   },
+    { id:113, event_type:'sequence_loaded',   payload:{step_count:5,date:now.toISOString().slice(0,10)}, occurred_at: hm(8,1)  },
+    { id:112, event_type:'config_changed',    payload:{new_sequence_id:1,changed_by:'admin'},       occurred_at: hm(7,55)  },
+  ],
+  2: [
+    { id:241, event_type:'heartbeat',         payload:{},                                           occurred_at: ago(18)   },
+    { id:240, event_type:'heartbeat',         payload:{},                                           occurred_at: ago(33)   },
+    { id:239, event_type:'step_acknowledged', payload:{step_key:'step-002',title:'Eat breakfast'},  occurred_at: hm(8,52)  },
+    { id:238, event_type:'alarm_escalated',   payload:{step_key:'step-002',title:'Eat breakfast',level:1}, occurred_at: hm(8,40) },
+    { id:237, event_type:'heartbeat',         payload:{},                                           occurred_at: hm(8,32)  },
+    { id:236, event_type:'step_acknowledged', payload:{step_key:'step-001',title:'Take morning medication'}, occurred_at: hm(8,6) },
+    { id:235, event_type:'heartbeat',         payload:{},                                           occurred_at: hm(8,2)   },
+    { id:234, event_type:'sequence_loaded',   payload:{step_count:5,date:now.toISOString().slice(0,10)}, occurred_at: hm(8,1)  },
+  ],
+  3: [],
+};
+
+/* ── Mock fetch ────────────────────────────────────────────────────────── */
+const BASE = '/apps/athena/api/v1/manage';
+function ok(data, status=200) {
+  return Promise.resolve({ ok: status>=200&&status<300, status, json: ()=>Promise.resolve(data) });
+}
+window.fetch = (url, opts={}) => {
+  const method = (opts.method||'GET').toUpperCase();
+  const body   = opts.body ? JSON.parse(opts.body) : {};
+  const hdrs   = opts.headers ?? {};
+
+  if (method==='GET' && url===BASE+'/sequences') return ok(mockSequences);
+  if (method==='POST'&& url===BASE+'/sequences') {
+    const s={id:Date.now(),name:body.name,abstract:body.abstract??''};
+    mockSequences.push(s); return ok(s,201);
+  }
+  if (method==='GET' && url===BASE+'/clients') return ok(mockClients);
+  if (method==='POST'&& url===BASE+'/clients') {
+    const token=[...crypto.getRandomValues(new Uint8Array(32))].map(b=>b.toString(16).padStart(2,'0')).join('');
+    const c={id:Date.now(),slug:body.slug,name:body.name,sequence_id:body.sequenceId,last_heartbeat:null};
+    mockClients.push(c);
+    mockMonitor[c.id]={ client:{...c,heartbeat_status:'never',sequence_name:mockSequences.find(s=>s.id===body.sequenceId)?.name??''}, today:{date:now.toISOString().slice(0,10),stats:{heartbeats:0,acknowledged:0,missed:0,alarms:0},hb_timeline:buildTimeline(0),steps:[]}};
+    mockEvents[c.id]=[];
+    return ok({client:c,token},201);
+  }
+  let m;
+  if ((m=url.match(/\/clients\/(\d+)$/)) && method==='PUT') {
+    const id=+m[1]; const c=mockClients.find(x=>x.id===id); if(!c)return ok({},404);
+    if(body.name)c.name=body.name; if(body.sequenceId)c.sequence_id=body.sequenceId; if(body.slug)c.slug=body.slug;
+    if(mockMonitor[id])Object.assign(mockMonitor[id].client,c); return ok(c);
+  }
+  if ((m=url.match(/\/clients\/(\d+)$/)) && method==='DELETE') {
+    const id=+m[1]; mockClients=mockClients.filter(x=>x.id!==id); delete mockMonitor[id]; delete mockEvents[id]; return ok({},204);
+  }
+  if ((m=url.match(/\/clients\/(\d+)\/token$/)) && method==='POST') {
+    const token=[...crypto.getRandomValues(new Uint8Array(32))].map(b=>b.toString(16).padStart(2,'0')).join('');
+    return ok({token});
+  }
+  if ((m=url.match(/\/clients\/(\d+)\/sequences$/)) && method==='GET') {
+    return ok(mockSequences);
+  }
+  if ((m=url.match(/\/clients\/(\d+)\/shares\/(\d+)$/)) && method==='PUT') {
+    const [,cid,sid]=[...m].map(Number); const sh=mockShares[cid]?.find(x=>x.id===sid);
+    if(sh){sh.can_edit=body.canEdit??sh.can_edit;} return ok(sh??{},sh?200:404);
+  }
+  if ((m=url.match(/\/clients\/(\d+)\/shares\/(\d+)$/)) && method==='DELETE') {
+    const [,cid,sid]=[...m].map(Number);
+    if(mockShares[cid]) mockShares[cid]=mockShares[cid].filter(x=>x.id!==sid);
+    return ok({},204);
+  }
+  if ((m=url.match(/\/clients\/(\d+)\/shares$/)) && method==='GET') {
+    const id=+m[1]; return ok(mockShares[id]??[]);
+  }
+  if ((m=url.match(/\/clients\/(\d+)\/shares$/)) && method==='POST') {
+    const id=+m[1];
+    const newShare={ id: Date.now(), client_id:id, shared_with_user_id:body.shareWith,
+      shared_with_display: mockUsers.find(u=>u.uid===body.shareWith)?.displayName??body.shareWith,
+      can_edit:body.canEdit??false, created_at:new Date().toISOString() };
+    if(!mockShares[id]) mockShares[id]=[];
+    if(mockShares[id].find(x=>x.shared_with_user_id===body.shareWith)) return ok({message:'Already shared'},409);
+    mockShares[id].push(newShare); return ok(newShare,201);
+  }
+  if (url.includes('/users/search') && method==='GET') {
+    const q=new URL('http://x'+url).searchParams.get('q')??'';
+    return ok(mockUsers.filter(u=>u.uid.includes(q.toLowerCase())||u.displayName.toLowerCase().includes(q.toLowerCase())));
+  }
+  if ((m=url.match(/\/clients\/(\d+)\/monitor$/)) && method==='GET') {
+    const id=+m[1]; return mockMonitor[id]?ok(mockMonitor[id]):ok({error:'not found'},404);
+  }
+  if ((m=url.match(/\/clients\/(\d+)\/events(\?.*)?$/)) && method==='GET') {
+    const id=+m[1]; return ok(mockEvents[id]??[]);
+  }
+  return ok({error:'unhandled'},404);
+};
+
+/* ── State ─────────────────────────────────────────────────────────────── */
+let sequences=[],clients=[],activeId=null,refreshTimer=null,editingId=null,evView='list',lastEvents=[];
+let shareTarget=null, shareSearchResult=[];
+const hdrs = ()=>({'Content-Type':'application/json','requesttoken':OC.requestToken});
+
+/* ── Bootstrap ─────────────────────────────────────────────────────────── */
+async function init() {
+  await Promise.all([
+    fetch(BASE+'/sequences',{headers:hdrs()}).then(r=>r.json()).then(d=>sequences=d),
+    fetch(BASE+'/clients',  {headers:hdrs()}).then(r=>r.json()).then(d=>clients=d),
+  ]);
+  renderSidebar();
+  if (clients.length) await selectClient(clients[0].id);
+}
+
+/* ── Sidebar ────────────────────────────────────────────────────────────── */
+function renderSidebar() {
+  const el=$('client-list'); el.innerHTML='';
+  for (const c of clients) {
+    const hbStatus = heartbeatStatus(c.last_heartbeat);
+    const seq = sequences.find(s=>s.id===c.sequence_id);
+    const div=document.createElement('div');
+    div.className='client-card'+(activeId===c.id?' active':'');
+    const sharedBadge=c.is_owner?'':` <span class="cc-shared-badge">${c.can_edit?'edit':'view'}</span>`;
+    div.innerHTML=`
+      <span class="hb ${hbStatus}" id="sb-hb-${c.id}"></span>
+      <div class="cc-info">
+        <div class="cc-name">${esc(c.name)}${sharedBadge}</div>
+        <div class="cc-sub">${esc(c.slug)} · ${esc(seq?.name??'—')}</div>
+      </div>
+      <span class="cc-caret">›</span>`;
+    div.onclick=()=>selectClient(c.id);
+    el.appendChild(div);
+  }
+}
+
+function heartbeatStatus(ts) {
+  if (!ts) return 'never';
+  const s=(Date.now()-new Date(ts))/1000;
+  return s<300?'active':s<1800?'idle':'offline';
+}
+
+/* ── Select client ──────────────────────────────────────────────────────── */
+async function selectClient(id) {
+  activeId=id;
+  clearTimeout(refreshTimer);
+  renderSidebar();
+  $('placeholder').style.display='none';
+  $('dashboard').style.display='flex';
+  await Promise.all([renderMonitor(id), renderEvents(id)]);
+  refreshTimer=setTimeout(()=>autoRefresh(id), 30000);
+}
+
+async function autoRefresh(id) {
+  if (activeId!==id) return;
+  await Promise.all([renderMonitor(id), renderEvents(id)]);
+  refreshTimer=setTimeout(()=>autoRefresh(id), 30000);
+}
+
+/* ── Monitor panel ──────────────────────────────────────────────────────── */
+async function renderMonitor(id) {
+  const r=await fetch(`${BASE}/clients/${id}/monitor`,{headers:hdrs()});
+  if(!r.ok)return;
+  const {client,today}=await r.json();
+
+  // Header
+  $('db-name').textContent=client.name;
+  const dot=$('db-hb-dot'); dot.className='hb '+client.heartbeat_status;
+  $('db-hb-label').textContent=client.last_heartbeat?'Last seen '+relTime(client.last_heartbeat):'Never connected';
+  const acts=[];
+  if(client.can_edit) acts.push(`<button class="btn btn-ghost btn-sm" onclick="openEditClient()">Edit</button>`);
+  if(client.is_owner) acts.push(`<button class="btn btn-ghost btn-sm" onclick="doRotateToken()">Rotate token</button>`);
+  if(client.is_owner) acts.push(`<button class="btn btn-ghost btn-sm" onclick="openShare()">Share</button>`);
+  if(client.is_owner) acts.push(`<button class="btn btn-danger btn-sm" onclick="doDeleteClient()">Delete</button>`);
+  $('db-actions').innerHTML=acts.join('');
+
+  // Stats
+  const {stats}=today;
+  $('db-stats').innerHTML=`
+    <div class="stat-pill blue"><div class="sp-val">${stats.heartbeats}</div><div class="sp-label">Heartbeats</div></div>
+    <div class="stat-pill green"><div class="sp-val">${stats.acknowledged}</div><div class="sp-label">Acknowledged</div></div>
+    <div class="stat-pill red"><div class="sp-val">${stats.missed}</div><div class="sp-label">Missed</div></div>
+    <div class="stat-pill amber"><div class="sp-val">${stats.alarms}</div><div class="sp-label">Alarms fired</div></div>`;
+
+  // Heartbeat timeline
+  renderTimeline(today.hb_timeline);
+  $('hb-refresh').textContent='updated '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+
+  // Steps
+  const stepMap={acknowledged:'acked',missed:'missed',pending:'pending'};
+  const stepIcon={acknowledged:'✅',missed:'❌',pending:'⏳'};
+  if (!today.steps.length) {
+    $('steps-list').innerHTML='<div style="padding:14px;color:var(--text-muted);font-size:.8em;font-style:italic">No steps for today.</div>';
+  } else {
+    $('steps-list').innerHTML=today.steps.map(s=>`
+      <div class="step-row">
+        <span class="step-time-badge">${esc(s.scheduled_time)}</span>
+        <span class="step-icon">${stepIcon[s.status]}</span>
+        <span class="step-name ${stepMap[s.status]}">${esc(s.title)}</span>
+      </div>`).join('');
+  }
+
+  // Update sidebar hb dot
+  const sbDot=document.getElementById('sb-hb-'+id);
+  if(sbDot) sbDot.className='hb '+client.heartbeat_status;
+}
+
+function renderTimeline(slots) {
+  $('hb-slots').innerHTML=slots.map((s,i)=>`<div class="hb-slot s-${s}" title="${slotLabel(i)}: ${s}"></div>`).join('');
+}
+
+function slotLabel(i) {
+  const h=Math.floor(i/2), m=i%2?'30':'00';
+  return String(h).padStart(2,'0')+':'+m;
+}
+
+/* ── Event timeline ─────────────────────────────────────────────────────── */
+const evColors = {
+  heartbeat:'#60A5FA', step_acknowledged:'#4ADE80', step_missed:'#F87171',
+  alarm_escalated:'#FBB040', button_press:'#C084FC', sequence_loaded:'#34D399', config_changed:'#94A3B8',
+};
+const evLanes     = Object.keys(evColors);
+const evLaneLabel = { heartbeat:'Heartbeat', step_acknowledged:"Ack'd", step_missed:'Missed',
+  alarm_escalated:'Alarm', button_press:'Button', sequence_loaded:'Loaded', config_changed:'Config' };
+
+function buildTimelineSVG(events) {
+  const VW=800, LANE_H=30, LABEL_W=80, PAD_T=10, PAD_B=26, R=5;
+  const VH = PAD_T + evLanes.length * LANE_H + PAD_B;
+  const PLOT_W = VW - LABEL_W - 8;
+  const now=Date.now(), tMax=now;
+  const oldest=events.length ? new Date(events[events.length-1].occurred_at).getTime() : now-3600000;
+  const tMin=Math.min(oldest,now-3600000);
+  const tRange=tMax-tMin||1;
+  const xOf=t=>LABEL_W+((t-tMin)/tRange)*PLOT_W;
+
+  let gridLines='';
+  let gt=Math.ceil(tMin/3600000)*3600000;
+  while(gt<=tMax){
+    const x=xOf(gt).toFixed(1);
+    const lbl=new Date(gt).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+    gridLines+=`<line x1="${x}" y1="${PAD_T}" x2="${x}" y2="${PAD_T+evLanes.length*LANE_H}" stroke="#242D45" stroke-width="1"/>`;
+    gridLines+=`<text x="${x}" y="${VH-4}" fill="#4D5D80" font-size="9" font-family="Martian Mono,monospace" text-anchor="middle">${lbl}</text>`;
+    gt+=3600000;
+  }
+  let lanesBg='', labels='';
+  evLanes.forEach((type,i)=>{
+    const y=PAD_T+i*LANE_H;
+    lanesBg+=`<rect x="${LABEL_W}" y="${y}" width="${PLOT_W}" height="${LANE_H}" fill="${i%2===0?'#121828':'#0F1522'}"/>`;
+    lanesBg+=`<line x1="${LABEL_W}" y1="${y+LANE_H}" x2="${LABEL_W+PLOT_W}" y2="${y+LANE_H}" stroke="#242D45" stroke-width="1"/>`;
+    labels+=`<rect x="4" y="${y+LANE_H/2-5}" width="8" height="8" rx="2" fill="${evColors[type]}"/>`;
+    labels+=`<text x="17" y="${y+LANE_H/2+4}" fill="#8A97B8" font-size="10" font-family="DM Sans,sans-serif">${evLaneLabel[type]}</text>`;
+  });
+  const nowX=xOf(tMax).toFixed(1);
+  const nowLine=`<line x1="${nowX}" y1="${PAD_T}" x2="${nowX}" y2="${PAD_T+evLanes.length*LANE_H}" stroke="#3B4F70" stroke-width="1" stroke-dasharray="3,3"/>`;
+
+  let dots='';
+  events.forEach(ev=>{
+    const li=evLanes.indexOf(ev.event_type); if(li<0)return;
+    const x=xOf(new Date(ev.occurred_at).getTime()).toFixed(1);
+    const y=(PAD_T+li*LANE_H+LANE_H/2).toFixed(1);
+    const meta=evMeta[ev.event_type]??{desc:()=>ev.event_type};
+    const raw=meta.desc(ev.payload??{}).replace(/<[^>]*>/g,'');
+    const ts=new Date(ev.occurred_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    const tip=(ts+'\n'+raw).replace(/"/g,'&quot;');
+    dots+=`<circle cx="${x}" cy="${y}" r="${R}" fill="${evColors[ev.event_type]||'#94A3B8'}" opacity=".85" class="ev-dot" data-tip="${tip}"/>`;
+  });
+
+  const svgEl=document.createElementNS('http://www.w3.org/2000/svg','svg');
+  svgEl.setAttribute('width','100%'); svgEl.setAttribute('height',VH);
+  svgEl.setAttribute('viewBox',`0 0 ${VW} ${VH}`); svgEl.setAttribute('preserveAspectRatio','none');
+  svgEl.innerHTML=lanesBg+gridLines+nowLine+labels+dots;
+  const tl=$('ev-timeline'); tl.innerHTML=''; tl.appendChild(svgEl);
+  const tip=$('ev-tip');
+  tl.querySelectorAll('.ev-dot').forEach(dot=>{
+    dot.style.cursor='pointer';
+    dot.addEventListener('mouseenter',()=>{ tip.textContent=dot.dataset.tip; tip.style.display='block'; });
+    dot.addEventListener('mousemove', e=>{ tip.style.left=(e.clientX+14)+'px'; tip.style.top=(e.clientY-8)+'px'; });
+    dot.addEventListener('mouseleave',()=>{ tip.style.display='none'; });
+  });
+}
+
+window.setEvView=function(view){
+  evView=view;
+  document.querySelectorAll('.evtb').forEach(b=>b.classList.toggle('active',b.dataset.view===view));
+  $('ev-list').style.display    =view==='list'    ?'':'none';
+  $('ev-timeline').style.display=view==='timeline'?'':'none';
+  if(view==='timeline'&&lastEvents.length) requestAnimationFrame(()=>buildTimelineSVG(lastEvents));
+};
+
+/* ── Event stream ───────────────────────────────────────────────────────── */
+const evMeta = {
+  heartbeat:         { label:'hb',      cls:'pill-hb',     desc: ()=>'Client connected' },
+  step_acknowledged: { label:'ack',     cls:'pill-ack',    desc: p=>`Acknowledged: <strong>${esc(p.title??p.step_key)}</strong>` },
+  step_missed:       { label:'missed',  cls:'pill-missed', desc: p=>`Missed: <strong>${esc(p.title??p.step_key)}</strong>` },
+  alarm_escalated:   { label:'alarm',   cls:'pill-alarm',  desc: p=>`Alarm level ${p.level??'?'} — <strong>${esc(p.title??p.step_key)}</strong>` },
+  button_press:      { label:'btn',     cls:'pill-btn',    desc: p=>`Button <strong>${esc(p.button)}</strong>${p.context?' ('+esc(p.context)+')':''}` },
+  sequence_loaded:   { label:'loaded',  cls:'pill-loaded', desc: p=>`Sequence loaded — <strong>${esc(p.step_count)} steps</strong>` },
+  config_changed:    { label:'config',  cls:'pill-config', desc: p=>`Sequence reassigned by <strong>${esc(p.changed_by)}</strong>` },
+};
+
+async function renderEvents(id) {
+  const r=await fetch(`${BASE}/clients/${id}/events`,{headers:hdrs()});
+  if(!r.ok)return;
+  const events=await r.json();
+  lastEvents=events;
+  $('ev-count').textContent=events.length+' events';
+
+  if(!events.length){
+    $('ev-list').innerHTML='<div style="padding:16px;color:var(--text-muted);font-size:.8em;font-style:italic">No events yet.</div>';
+    $('ev-timeline').innerHTML='';
+    return;
+  }
+  $('ev-list').innerHTML=events.map(ev=>{
+    const meta=evMeta[ev.event_type]??{label:ev.event_type,cls:'pill-config',desc:()=>ev.event_type};
+    return `<div class="ev-row">
+      <span class="ev-time">${fmtTs(ev.occurred_at)}</span>
+      <span class="ev-pill ${meta.cls}">${meta.label}</span>
+      <span class="ev-desc">${meta.desc(ev.payload??{})}</span>
+    </div>`;
+  }).join('');
+  if(evView==='timeline') requestAnimationFrame(()=>buildTimelineSVG(events));
+}
+
+/* ── Create client ──────────────────────────────────────────────────────── */
+window.openCreateClient=function(){
+  editingId=null;
+  $('mc-title').textContent='New client';
+  $('mc-name').value=''; $('mc-slug').value='';
+  populateSeqSel(); $('mc-save').onclick=saveNewClient;
+  $('modal-client').classList.add('open');
+};
+window.openEditClient=async function(){
+  if(!activeId)return;
+  editingId=activeId;
+  const c=clients.find(x=>x.id===activeId); if(!c)return;
+  $('mc-title').textContent='Edit client';
+  $('mc-name').value=c.name; $('mc-slug').value=c.slug;
+  let seqList=sequences;
+  if(!c.is_owner){
+    const r=await fetch(`${BASE}/clients/${c.id}/sequences`,{headers:hdrs()});
+    if(r.ok) seqList=await r.json();
+  }
+  $('mc-seq').innerHTML=seqList.map(s=>`<option value="${s.id}"${s.id===c.sequence_id?' selected':''}>${esc(s.name)}</option>`).join('');
+  $('mc-save').onclick=saveEditClient;
+  $('modal-client').classList.add('open');
+};
+function populateSeqSel(sel){
+  $('mc-seq').innerHTML=sequences.map(s=>`<option value="${s.id}"${s.id===sel?' selected':''}>${esc(s.name)}</option>`).join('');
+}
+async function saveNewClient(){
+  const p={name:$('mc-name').value.trim(),slug:$('mc-slug').value.trim(),sequenceId:+$('mc-seq').value};
+  if(!p.name||!p.slug){alert('Name and slug required');return;}
+  const r=await fetch(BASE+'/clients',{method:'POST',headers:hdrs(),body:JSON.stringify(p)});
+  const d=await r.json(); if(!r.ok){alert(d.error??'Error');return;}
+  closeModal('modal-client'); showToken(d.token);
+  clients=await fetch(BASE+'/clients',{headers:hdrs()}).then(r=>r.json());
+  renderSidebar();
+}
+async function saveEditClient(){
+  const p={name:$('mc-name').value.trim(),slug:$('mc-slug').value.trim(),sequenceId:+$('mc-seq').value};
+  const r=await fetch(`${BASE}/clients/${editingId}`,{method:'PUT',headers:hdrs(),body:JSON.stringify(p)});
+  if(!r.ok){alert('Error');return;}
+  closeModal('modal-client');
+  clients=await fetch(BASE+'/clients',{headers:hdrs()}).then(r=>r.json());
+  if(activeId===editingId)await renderMonitor(activeId);
+  renderSidebar();
+}
+
+/* ── Delete / rotate ────────────────────────────────────────────────────── */
+window.doDeleteClient=async function(){
+  if(!activeId)return;
+  const c=clients.find(x=>x.id===activeId);
+  if(!confirm(`Delete "${c?.name}"? This cannot be undone.`))return;
+  await fetch(`${BASE}/clients/${activeId}`,{method:'DELETE',headers:hdrs()});
+  clearTimeout(refreshTimer);
+  clients=clients.filter(x=>x.id!==activeId);
+  activeId=null;
+  $('dashboard').style.display='none'; $('placeholder').style.display='';
+  renderSidebar();
+  if(clients.length)await selectClient(clients[0].id);
+};
+window.doRotateToken=async function(){
+  if(!activeId)return;
+  const c=clients.find(x=>x.id===activeId);
+  if(!confirm(`Rotate token for "${c?.name}"? The old token stops working immediately.`))return;
+  const r=await fetch(`${BASE}/clients/${activeId}/token`,{method:'POST',headers:hdrs()});
+  const d=await r.json(); if(!r.ok){alert('Error');return;}
+  showToken(d.token);
+};
+
+/* ── Create sequence ────────────────────────────────────────────────────── */
+window.openCreateSequence=function(){
+  $('ms-name').value=''; $('ms-abstract').value='';
+  $('ms-save').onclick=saveNewSequence;
+  $('modal-seq').classList.add('open');
+};
+async function saveNewSequence(){
+  const p={name:$('ms-name').value.trim(),abstract:$('ms-abstract').value.trim()};
+  if(!p.name){alert('Name required');return;}
+  const r=await fetch(BASE+'/sequences',{method:'POST',headers:hdrs(),body:JSON.stringify(p)});
+  if(!r.ok){alert('Error');return;}
+  closeModal('modal-seq');
+  sequences=await fetch(BASE+'/sequences',{headers:hdrs()}).then(r=>r.json());
+  renderSidebar();
+}
+
+/* ── Token modal ────────────────────────────────────────────────────────── */
+function showToken(t){ $('token-val').textContent=t; $('modal-token').classList.add('open'); }
+
+/* ── Share management ───────────────────────────────────────────────────── */
+window.openShare=async function(){
+  if(!activeId)return;
+  const c=clients.find(x=>x.id===activeId); if(!c||!c.is_owner)return;
+  shareTarget={id:c.id,name:c.name};
+  $('share-search').value=''; $('share-can-edit').checked=false;
+  $('share-autocomplete').style.display='none'; shareSearchResult=[];
+  await refreshShareList();
+  $('modal-share').classList.add('open');
+};
+async function refreshShareList(){
+  const r=await fetch(`${BASE}/clients/${shareTarget.id}/shares`,{headers:hdrs()});
+  if(!r.ok)return;
+  const shares=await r.json();
+  const wrap=$('share-list');
+  if(!shares.length){wrap.innerHTML='<div style="color:var(--text-muted);font-size:.8em;font-style:italic;padding:8px 0">No shares yet.</div>';return;}
+  wrap.innerHTML=shares.map(s=>`
+    <div class="share-row" id="sr-${s.id}">
+      <div class="share-user">${esc(s.shared_with_display)}<small>${esc(s.shared_with_user_id)}</small></div>
+      <label class="share-perm">
+        <input type="checkbox" onchange="toggleShareEdit(${s.id},this.checked)"${s.can_edit?' checked':''}/>Edit
+      </label>
+      <button class="btn btn-danger btn-sm" onclick="removeShare(${s.id})">Remove</button>
+    </div>`).join('');
+}
+window.addShare=async function(){
+  const uid=$('share-search').dataset.selectedUid;
+  if(!uid){alert('Select a user from the search results first.');return;}
+  const canEdit=$('share-can-edit').checked;
+  const r=await fetch(`${BASE}/clients/${shareTarget.id}/shares`,{method:'POST',headers:hdrs(),body:JSON.stringify({shareWith:uid,canEdit})});
+  if(!r.ok){const d=await r.json().catch(()=>({}));alert(d.message??'Error creating share');return;}
+  $('share-search').value=''; delete $('share-search').dataset.selectedUid;
+  $('share-can-edit').checked=false; $('share-autocomplete').style.display='none';
+  await refreshShareList();
+};
+window.toggleShareEdit=async function(shareId,canEdit){
+  await fetch(`${BASE}/clients/${shareTarget.id}/shares/${shareId}`,{method:'PUT',headers:hdrs(),body:JSON.stringify({canEdit})});
+};
+window.removeShare=async function(shareId){
+  await fetch(`${BASE}/clients/${shareTarget.id}/shares/${shareId}`,{method:'DELETE',headers:hdrs()});
+  await refreshShareList();
+};
+
+/* ── Share autocomplete ─────────────────────────────────────────────────── */
+let searchDebounce=null;
+$('share-search').addEventListener('input',()=>{
+  clearTimeout(searchDebounce);
+  const q=$('share-search').value.trim();
+  delete $('share-search').dataset.selectedUid;
+  if(q.length<2){$('share-autocomplete').style.display='none';return;}
+  searchDebounce=setTimeout(async()=>{
+    const r=await fetch(`${BASE}/users/search?q=`+encodeURIComponent(q),{headers:hdrs()});
+    if(!r.ok)return;
+    const users=await r.json(); shareSearchResult=users;
+    const ac=$('share-autocomplete');
+    if(!users.length){ac.style.display='none';return;}
+    ac.innerHTML=users.map((u,i)=>`<div class="share-ac-item" data-idx="${i}">${esc(u.displayName)}<small>${esc(u.uid)}</small></div>`).join('');
+    ac.querySelectorAll('.share-ac-item').forEach(el=>{
+      el.addEventListener('click',()=>{
+        const u=shareSearchResult[+el.dataset.idx];
+        $('share-search').value=u.displayName+' ('+u.uid+')';
+        $('share-search').dataset.selectedUid=u.uid;
+        ac.style.display='none';
+      });
+    });
+    ac.style.display='block';
+  },300);
+});
+document.addEventListener('click',e=>{
+  if(!$('share-search-wrap').contains(e.target)) $('share-autocomplete').style.display='none';
+});
+
+/* ── Shared ─────────────────────────────────────────────────────────────── */
+window.closeModal=id=>$(id).classList.remove('open');
+document.querySelectorAll('.modal-back').forEach(el=>
+  el.addEventListener('click',e=>{if(e.target===el)el.classList.remove('open');}));
+
+init();
+}());
+</script>
+</body>
+</html>
