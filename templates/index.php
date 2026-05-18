@@ -430,7 +430,7 @@ button { cursor: pointer; font-family: var(--fb); }
     </p>
     <div class="token-box" id="token-val"></div>
     <div class="modal-note">
-      Configure this as <code>Authorization: Bearer &lt;token&gt;</code> on the Kobo device.
+      This token must be configured in the client device.
     </div>
     <div class="modal-actions">
       <button class="btn btn-primary" id="token-done">Done</button>
