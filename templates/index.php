@@ -3,31 +3,31 @@ declare(strict_types=1);
 /** @var \OCP\IL10N $l */
 ?>
 <style>
-/* ── Design tokens (dark monitoring theme) ─────────────────────────────── */
+/* ── Design tokens (light monitoring theme) ─────────────────────────────── */
 #app {
-  --ab:         #0B0F1A;
-  --as:         #121828;
-  --as2:        #1A2035;
-  --as3:        #212840;
-  --abr:        #242D45;
-  --abr2:       #2E3855;
-  --at:         #D4DCF0;
-  --atd:        #8A97B8;
-  --atm:        #4D5D80;
-  --green:      #4ADE80;
-  --green-dim:  rgba(74,222,128,.12);
-  --amber:      #FBB040;
-  --amber-dim:  rgba(251,176,64,.12);
-  --red:        #F87171;
-  --red-dim:    rgba(248,113,113,.12);
-  --blue:       #60A5FA;
-  --blue-dim:   rgba(96,165,250,.12);
-  --purple:     #C084FC;
-  --purple-dim: rgba(192,132,252,.12);
-  --teal:       #34D399;
-  --teal-dim:   rgba(52,211,153,.12);
-  --grey:       #94A3B8;
-  --grey-dim:   rgba(148,163,184,.12);
+  --ab:         #EDF0F7;
+  --as:         #FFFFFF;
+  --as2:        #F4F6FB;
+  --as3:        #E8ECF5;
+  --abr:        #D1D8E8;
+  --abr2:       #C4CEDE;
+  --at:         #1A2035;
+  --atd:        #4D5D80;
+  --atm:        #8A97B8;
+  --green:      #16A34A;
+  --green-dim:  rgba(22,163,74,.10);
+  --amber:      #D97706;
+  --amber-dim:  rgba(217,119,6,.10);
+  --red:        #DC2626;
+  --red-dim:    rgba(220,38,38,.10);
+  --blue:       #2563EB;
+  --blue-dim:   rgba(37,99,235,.10);
+  --purple:     #7C3AED;
+  --purple-dim: rgba(124,58,237,.10);
+  --teal:       #0D9488;
+  --teal-dim:   rgba(13,148,136,.10);
+  --grey:       #64748B;
+  --grey-dim:   rgba(100,116,139,.10);
   --fh: var(--font-face, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
   --fb: var(--font-face, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
   --fm: ui-monospace, 'Cascadia Code', 'Fira Code', 'Consolas', 'Courier New', monospace;
@@ -36,6 +36,8 @@ declare(strict_types=1);
 /* ── NC layout integration ─────────────────────────────────────────────── */
 #app {
   display: flex;
+  width: 100%;
+  min-height: 100%;
   height: 100%;
   background: var(--ab);
   color: var(--at);
@@ -58,9 +60,10 @@ declare(strict_types=1);
 /* Override NC's content area */
 #app-content {
   background: var(--ab) !important;
-  flex: 1;
+  flex: 1 1 0%;
   overflow-y: auto;
   min-width: 0;
+  min-height: 100%;
   padding: 0 !important;
   display: flex;
   flex-direction: column;
@@ -231,7 +234,7 @@ declare(strict_types=1);
 .evtb.active { background:var(--as3); color:var(--at); }
 #ev-timeline { overflow-x:hidden; padding:12px 4px; }
 #ev-timeline svg { display:block; }
-#ev-tip { position:fixed; z-index:9999; pointer-events:none; background:#1A2035; border:1px solid #2E3855; border-radius:5px; padding:6px 10px; font-family:'Martian Mono',monospace; font-size:.72em; color:#D4DCF0; box-shadow:0 4px 16px rgba(0,0,0,.5); display:none; max-width:280px; line-height:1.5; white-space:pre-line; }
+#ev-tip { position:fixed; z-index:9999; pointer-events:none; background:#1A2035; border:1px solid #2E3855; border-radius:5px; padding:6px 10px; font-family:var(--fm); font-size:.72em; color:#E8ECF5; box-shadow:0 4px 16px rgba(0,0,0,.2); display:none; max-width:280px; line-height:1.5; white-space:pre-line; }
 
 /* Steps */
 .step-row {
@@ -253,25 +256,25 @@ declare(strict_types=1);
 /* ── Buttons ────────────────────────────────────────────────────────────── */
 button { cursor: pointer; font-family: var(--fb); }
 .btn { border: none; border-radius: 5px; padding: 6px 13px; font-size: .8em; font-weight: 500; }
-.btn-primary { background: var(--blue); color: #0B0F1A; }
-.btn-primary:hover { filter: brightness(1.1); }
-.btn-ghost   { background: var(--as3); color: var(--atd); border: 1px solid var(--abr2); }
-.btn-ghost:hover { background: var(--as2); color: var(--at); }
-.btn-danger  { background: var(--red-dim); color: var(--red); border: 1px solid rgba(248,113,113,.2); }
-.btn-danger:hover { background: rgba(248,113,113,.2); }
+.btn-primary { background: var(--at); color: #FFFFFF; }
+.btn-primary:hover { filter: brightness(1.25); }
+.btn-ghost   { background: transparent; color: var(--at); border: 1px solid var(--abr2); }
+.btn-ghost:hover { background: var(--as3); }
+.btn-danger  { background: var(--red-dim); color: var(--red); border: 1px solid rgba(220,38,38,.25); }
+.btn-danger:hover { background: rgba(220,38,38,.18); }
 .btn-sm { padding: 4px 10px; font-size: .75em; }
 
 /* ── Modals ─────────────────────────────────────────────────────────────── */
 .athena-modal-back {
   display: none; position: fixed; inset: 0;
-  background: rgba(0,0,0,.65); z-index: 9999;
+  background: rgba(0,0,0,.35); z-index: 9999;
   align-items: center; justify-content: center;
 }
 .athena-modal-back.open { display: flex; }
 .athena-modal {
   background: var(--as); border: 1px solid var(--abr2);
   border-radius: 10px; padding: 24px; width: 460px; max-width: 95vw;
-  box-shadow: 0 20px 60px rgba(0,0,0,.7);
+  box-shadow: 0 8px 40px rgba(0,0,0,.12);
 }
 .athena-modal h3 { font-family: var(--fh); font-size: 1em; font-weight: 700; margin-bottom: 14px; color: var(--at); }
 .athena-modal label { display: block; font-size: .72em; color: var(--atm); text-transform: uppercase; letter-spacing: .06em; margin: 12px 0 5px; }

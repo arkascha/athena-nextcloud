@@ -138,13 +138,13 @@ async function renderMonitor(id) {
 
 /* ── Event timeline ─────────────────────────────────────────────────────── */
 const evColors = {
-  heartbeat:         '#60A5FA',
-  step_acknowledged: '#4ADE80',
-  step_missed:       '#F87171',
-  alarm_escalated:   '#FBB040',
-  button_press:      '#C084FC',
-  sequence_loaded:   '#34D399',
-  config_changed:    '#94A3B8',
+  heartbeat:         '#2563EB',
+  step_acknowledged: '#16A34A',
+  step_missed:       '#DC2626',
+  alarm_escalated:   '#D97706',
+  button_press:      '#7C3AED',
+  sequence_loaded:   '#0D9488',
+  config_changed:    '#64748B',
 };
 const evLanes     = Object.keys(evColors);
 const evLaneLabel = {
@@ -170,24 +170,24 @@ function buildTimelineSVG(events) {
   while (gt <= tMax) {
     const x = xOf(gt).toFixed(1);
     const lbl = new Date(gt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    gridLines += `<line x1="${x}" y1="${PAD_T}" x2="${x}" y2="${PAD_T + evLanes.length * LANE_H}" stroke="#242D45" stroke-width="1"/>`;
-    gridLines += `<text x="${x}" y="${VH - 4}" fill="#4D5D80" font-size="9" font-family="monospace" text-anchor="middle">${lbl}</text>`;
+    gridLines += `<line x1="${x}" y1="${PAD_T}" x2="${x}" y2="${PAD_T + evLanes.length * LANE_H}" stroke="#C4CEDE" stroke-width="1"/>`;
+    gridLines += `<text x="${x}" y="${VH - 4}" fill="#8A97B8" font-size="9" font-family="monospace" text-anchor="middle">${lbl}</text>`;
     gt += hourMs;
   }
 
   let lanesBg = '', labels = '';
   evLanes.forEach((type, i) => {
     const y  = PAD_T + i * LANE_H;
-    const bg = i % 2 === 0 ? '#121828' : '#0F1522';
+    const bg = i % 2 === 0 ? '#F8F9FC' : '#F0F3F8';
     lanesBg += `<rect x="${LABEL_W}" y="${y}" width="${PLOT_W}" height="${LANE_H}" fill="${bg}"/>`;
-    lanesBg += `<line x1="${LABEL_W}" y1="${y + LANE_H}" x2="${LABEL_W + PLOT_W}" y2="${y + LANE_H}" stroke="#242D45" stroke-width="1"/>`;
+    lanesBg += `<line x1="${LABEL_W}" y1="${y + LANE_H}" x2="${LABEL_W + PLOT_W}" y2="${y + LANE_H}" stroke="#D1D8E8" stroke-width="1"/>`;
     const col = evColors[type];
     labels   += `<rect x="4" y="${y + LANE_H / 2 - 5}" width="8" height="8" rx="2" fill="${col}"/>`;
-    labels   += `<text x="17" y="${y + LANE_H / 2 + 4}" fill="#8A97B8" font-size="10" font-family="sans-serif">${evLaneLabel[type]}</text>`;
+    labels   += `<text x="17" y="${y + LANE_H / 2 + 4}" fill="#4D5D80" font-size="10" font-family="sans-serif">${evLaneLabel[type]}</text>`;
   });
 
   const nowX    = xOf(tMax).toFixed(1);
-  const nowLine = `<line x1="${nowX}" y1="${PAD_T}" x2="${nowX}" y2="${PAD_T + evLanes.length * LANE_H}" stroke="#3B4F70" stroke-width="1" stroke-dasharray="3,3"/>`;
+  const nowLine = `<line x1="${nowX}" y1="${PAD_T}" x2="${nowX}" y2="${PAD_T + evLanes.length * LANE_H}" stroke="#A0B0CC" stroke-width="1" stroke-dasharray="3,3"/>`;
 
   let dots = '';
   events.forEach(ev => {
