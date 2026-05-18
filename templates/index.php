@@ -4,7 +4,7 @@ declare(strict_types=1);
 ?>
 <style>
 /* ── Design tokens (light monitoring theme) ─────────────────────────────── */
-#app {
+:root {
   --ab:         #EDF0F7;
   --as:         #FFFFFF;
   --as2:        #F4F6FB;
@@ -217,9 +217,9 @@ declare(strict_types=1);
 .share-perm input[type=checkbox] { accent-color:var(--blue); width:14px; height:14px; cursor:pointer; }
 #share-list-wrap { max-height:200px; overflow-y:auto; margin-bottom:10px; }
 #share-search-wrap { position:relative; }
-#share-search { width:100%; background:var(--as2); border:1px solid var(--abr2); border-radius:5px; padding:7px 10px; font-size:.85em; color:var(--at); font-family:var(--fb); outline:none; box-sizing:border-box; }
-#share-search:focus { border-color:var(--blue); box-shadow:0 0 0 2px rgba(96,165,250,.15); }
-#share-autocomplete { position:absolute; top:calc(100% + 3px); left:0; right:0; z-index:100; background:var(--as2); border:1px solid var(--abr2); border-radius:5px; box-shadow:0 6px 20px rgba(0,0,0,.5); overflow:hidden; display:none; }
+#share-search { width:100%; background:var(--as); border:1px solid var(--abr); border-radius:5px; padding:7px 10px; font-size:.85em; color:var(--at); font-family:var(--fb); outline:none; box-sizing:border-box; }
+#share-search:focus { border-color:var(--blue); box-shadow:0 0 0 2px rgba(37,99,235,.15); }
+#share-autocomplete { position:absolute; top:calc(100% + 3px); left:0; right:0; z-index:100; background:var(--as); border:1px solid var(--abr); border-radius:5px; box-shadow:0 6px 20px rgba(0,0,0,.12); overflow:hidden; display:none; }
 .share-ac-item { padding:8px 12px; cursor:pointer; font-size:.83em; display:flex; flex-direction:column; gap:1px; }
 .share-ac-item:hover { background:var(--as3); }
 .share-ac-item small { color:var(--atm); font-family:var(--fm); font-size:.85em; }
@@ -272,30 +272,30 @@ button { cursor: pointer; font-family: var(--fb); }
 }
 .athena-modal-back.open { display: flex; }
 .athena-modal {
-  background: var(--as); border: 1px solid var(--abr2);
+  background: var(--as2); border: 1px solid var(--abr);
   border-radius: 10px; padding: 24px; width: 460px; max-width: 95vw;
-  box-shadow: 0 8px 40px rgba(0,0,0,.12);
+  box-shadow: 0 8px 40px rgba(0,0,0,.18);
 }
 .athena-modal h3 { font-family: var(--fh); font-size: 1em; font-weight: 700; margin-bottom: 14px; color: var(--at); }
-.athena-modal label { display: block; font-size: .72em; color: var(--atm); text-transform: uppercase; letter-spacing: .06em; margin: 12px 0 5px; }
+.athena-modal label { display: block; font-size: .72em; color: var(--atd); text-transform: uppercase; letter-spacing: .06em; margin: 12px 0 5px; }
 .athena-modal input, .athena-modal select, .athena-modal textarea {
-  width: 100%; background: var(--as2); border: 1px solid var(--abr2);
+  width: 100%; background: var(--as); border: 1px solid var(--abr);
   border-radius: 5px; padding: 7px 10px; font-size: .85em; color: var(--at);
   font-family: var(--fb); outline: none; box-sizing: border-box;
 }
 .athena-modal input:focus, .athena-modal select:focus, .athena-modal textarea:focus {
-  border-color: var(--blue); box-shadow: 0 0 0 2px rgba(96,165,250,.15);
+  border-color: var(--blue); box-shadow: 0 0 0 2px rgba(37,99,235,.15);
 }
 .athena-modal textarea { min-height: 72px; resize: vertical; }
-.athena-modal select option { background: var(--as2); }
+.athena-modal select option { background: var(--as); }
 .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; }
 .modal-note {
-  background: var(--amber-dim); border: 1px solid rgba(251,176,64,.2);
+  background: rgba(217,119,6,.08); border: 1px solid rgba(217,119,6,.3);
   border-radius: 5px; padding: 8px 12px; font-size: .75em; color: var(--amber);
   margin-top: 12px; line-height: 1.5;
 }
 .token-box {
-  background: var(--as2); border: 1px dashed var(--abr2); border-radius: 5px;
+  background: var(--as); border: 1px dashed var(--abr); border-radius: 5px;
   padding: 10px 12px; font-family: var(--fm); font-size: .78em;
   word-break: break-all; color: var(--green); margin-top: 10px; line-height: 1.6;
 }
