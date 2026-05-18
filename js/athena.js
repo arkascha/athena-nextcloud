@@ -8,6 +8,13 @@ const hdrs = () => ({ 'Content-Type': 'application/json', 'requesttoken': OC.req
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
+function slugify(name) {
+  return name.toLowerCase()
+    .replace(/[àáâãäå]/g,'a').replace(/[èéêë]/g,'e').replace(/[ìíîï]/g,'i')
+    .replace(/[òóôõöø]/g,'o').replace(/[ùúûü]/g,'u').replace(/[ñ]/g,'n').replace(/[ç]/g,'c')
+    .replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
+}
+
 function relTime(iso) {
   if (!iso) return 'never';
   const s = Math.round((Date.now() - new Date(iso)) / 1000);
@@ -325,9 +332,14 @@ window.athena = {
     $('mc-title').textContent = 'New client';
     $('mc-name').value = ''; $('mc-slug').value = '';
     populateSeqSel(null);
+    let slugManuallyEdited = false;
+    $('mc-slug').oninput = () => { slugManuallyEdited = $('mc-slug').value !== ''; };
+    $('mc-name').oninput = () => {
+      if (!slugManuallyEdited) $('mc-slug').value = slugify($('mc-name').value);
+    };
     $('mc-save').onclick = async () => {
-      const p = { name: $('mc-name').value.trim(), slug: $('mc-slug').value.trim(), sequenceId: seqSelValue() };
-      if (!p.name || !p.slug) { alert('Name and slug are required.'); return; }
+      const p = { name: $('mc-name').value.trim(), slug: $('mc-slug').value.trim() || null, sequenceId: seqSelValue() };
+      if (!p.name) { alert('Name is required.'); return; }
       let d;
       try { d = await apiFetch(BASE + '/clients', { method: 'POST', body: JSON.stringify(p) }); }
       catch (e) { alert('Error creating client: ' + e.message); return; }

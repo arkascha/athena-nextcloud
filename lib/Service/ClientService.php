@@ -120,12 +120,23 @@ class ClientService {
 
     // ── CRUD ──────────────────────────────────────────────────────────────────
 
-    public function create(string $userId, string $slug, string $name, ?int $sequenceId): array {
+    private function deriveSlug(string $name): string {
+        $slug = mb_strtolower($name);
+        $slug = preg_replace('/[^a-z0-9]+/', '-', $slug);
+        return trim($slug, '-') ?: 'client';
+    }
+
+    public function create(string $userId, ?string $slug, string $name, ?int $sequenceId): array {
+        $slug = ($slug !== null && $slug !== '') ? $slug : $this->deriveSlug($name);
         if (!preg_match('/^[a-z0-9_-]+$/', $slug)) {
             throw new \InvalidArgumentException('Slug may only contain lowercase letters, digits, hyphens and underscores');
         }
+        // ensure uniqueness by appending a counter if the derived slug is taken
         if ($this->clientMapper->slugExistsForUser($userId, $slug)) {
-            throw new \InvalidArgumentException("Slug '$slug' is already taken");
+            $base = $slug; $i = 2;
+            while ($this->clientMapper->slugExistsForUser($userId, $slug)) {
+                $slug = $base . '-' . $i++;
+            }
         }
 
         $tokenData = $this->generateToken();

@@ -38,7 +38,7 @@ class ManageClientController extends Controller {
 
     #[NoAdminRequired]
     #[NoCSRFRequired]
-    public function create(string $slug, string $name, ?int $sequenceId = null): DataResponse {
+    public function create(string $name, ?string $slug = null, ?int $sequenceId = null): DataResponse {
         if (trim($name) === '') {
             return new DataResponse(['error' => 'Name is required'], Http::STATUS_BAD_REQUEST);
         }

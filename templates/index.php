@@ -418,8 +418,8 @@ button { cursor: pointer; font-family: var(--fb); }
     <h3 id="mc-title">New client</h3>
     <label>Name</label>
     <input id="mc-name" placeholder="Maria's Kobo"/>
-    <label>Slug <small style="text-transform:none;font-weight:400;letter-spacing:0">(lowercase, digits, hyphens)</small></label>
-    <input id="mc-slug" placeholder="maria" style="font-family:var(--fm)"/>
+    <label>Slug <small style="text-transform:none;font-weight:400;letter-spacing:0">optional — derived from name if left blank</small></label>
+    <input id="mc-slug" placeholder="auto" style="font-family:var(--fm)"/>
     <label>Assigned sequence</label>
     <select id="mc-seq"></select>
     <div class="modal-actions">
