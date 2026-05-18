@@ -35,12 +35,29 @@ let sequences = [], clients = [], activeId = null, refreshTimer = null, editingI
 let evView = 'list', lastEvents = [];
 let shareTarget = null, shareSearchResult = [];
 
+/* ── Safe fetch helper ──────────────────────────────────────────────────── */
+async function apiFetch(url, opts = {}) {
+  const r = await fetch(url, { headers: hdrs(), ...opts });
+  const ct = r.headers.get('content-type') ?? '';
+  const body = ct.includes('application/json') ? await r.json() : await r.text();
+  if (!r.ok) {
+    const msg = (typeof body === 'object' ? body.error ?? body.message : body) || `HTTP ${r.status}`;
+    throw new Error(msg);
+  }
+  return body;
+}
+
 /* ── Bootstrap ─────────────────────────────────────────────────────────── */
 async function init() {
-  await Promise.all([
-    fetch(BASE + '/sequences', { headers: hdrs() }).then(r => r.json()).then(d => sequences = d),
-    fetch(BASE + '/clients',   { headers: hdrs() }).then(r => r.json()).then(d => clients   = d),
-  ]);
+  try {
+    await Promise.all([
+      apiFetch(BASE + '/sequences').then(d => sequences = d),
+      apiFetch(BASE + '/clients').then(d => clients = d),
+    ]);
+  } catch (e) {
+    console.error('Athena init failed:', e);
+    return;
+  }
   renderSidebar();
   if (clients.length) await selectClient(clients[0].id);
 }
@@ -267,13 +284,18 @@ async function renderEvents(id) {
 
 /* ── Client CRUD ────────────────────────────────────────────────────────── */
 function populateSeqSel(sel) {
-  $('mc-seq').innerHTML = sequences
-    .map(s => `<option value="${s.id}"${s.id === sel ? ' selected' : ''}>${esc(s.name)}</option>`)
-    .join('');
+  $('mc-seq').innerHTML =
+    `<option value=""${sel == null ? ' selected' : ''}>— none —</option>` +
+    sequences.map(s => `<option value="${s.id}"${s.id === sel ? ' selected' : ''}>${esc(s.name)}</option>`).join('');
+}
+
+function seqSelValue() {
+  const v = $('mc-seq').value;
+  return v === '' ? null : +v;
 }
 
 async function reloadClients() {
-  clients = await fetch(BASE + '/clients', { headers: hdrs() }).then(r => r.json());
+  clients = await apiFetch(BASE + '/clients');
 }
 
 window.athena = {
@@ -283,11 +305,11 @@ window.athena = {
     $('mc-name').value = ''; $('mc-slug').value = '';
     populateSeqSel(null);
     $('mc-save').onclick = async () => {
-      const p = { name: $('mc-name').value.trim(), slug: $('mc-slug').value.trim(), sequenceId: +$('mc-seq').value };
+      const p = { name: $('mc-name').value.trim(), slug: $('mc-slug').value.trim(), sequenceId: seqSelValue() };
       if (!p.name || !p.slug) { alert('Name and slug are required.'); return; }
-      const r = await fetch(BASE + '/clients', { method: 'POST', headers: hdrs(), body: JSON.stringify(p) });
-      const d = await r.json();
-      if (!r.ok) { alert(d.error ?? 'Error creating client'); return; }
+      let d;
+      try { d = await apiFetch(BASE + '/clients', { method: 'POST', body: JSON.stringify(p) }); }
+      catch (e) { alert('Error creating client: ' + e.message); return; }
       this.closeModal('athena-modal-client');
       this.showToken(d.token);
       await reloadClients(); renderSidebar();
@@ -307,14 +329,14 @@ window.athena = {
       const r = await fetch(`${BASE}/clients/${c.id}/sequences`, { headers: hdrs() });
       if (r.ok) seqList = await r.json();
     }
-    $('mc-seq').innerHTML = seqList
-      .map(s => `<option value="${s.id}"${s.id === c.sequence_id ? ' selected' : ''}>${esc(s.name)}</option>`)
-      .join('');
+    $('mc-seq').innerHTML =
+      `<option value=""${c.sequence_id == null ? ' selected' : ''}>— none —</option>` +
+      seqList.map(s => `<option value="${s.id}"${s.id === c.sequence_id ? ' selected' : ''}>${esc(s.name)}</option>`).join('');
 
     $('mc-save').onclick = async () => {
-      const p = { name: $('mc-name').value.trim(), slug: $('mc-slug').value.trim(), sequenceId: +$('mc-seq').value };
-      const r = await fetch(`${BASE}/clients/${editingId}`, { method: 'PUT', headers: hdrs(), body: JSON.stringify(p) });
-      if (!r.ok) { alert('Error updating client'); return; }
+      const p = { name: $('mc-name').value.trim(), slug: $('mc-slug').value.trim(), sequenceId: seqSelValue() };
+      try { await apiFetch(`${BASE}/clients/${editingId}`, { method: 'PUT', body: JSON.stringify(p) }); }
+      catch (e) { alert('Error updating client: ' + e.message); return; }
       this.closeModal('athena-modal-client');
       await reloadClients();
       if (activeId === editingId) await renderMonitor(activeId);
@@ -327,7 +349,7 @@ window.athena = {
     if (!activeId) return;
     const c = clients.find(x => x.id === activeId);
     if (!confirm(`Delete "${c?.name}"? This cannot be undone.`)) return;
-    await fetch(`${BASE}/clients/${activeId}`, { method: 'DELETE', headers: hdrs() });
+    try { await apiFetch(`${BASE}/clients/${activeId}`, { method: 'DELETE' }); } catch (e) { alert('Error deleting client: ' + e.message); return; }
     clearTimeout(refreshTimer);
     await reloadClients();
     activeId = null;
@@ -341,9 +363,9 @@ window.athena = {
     if (!activeId) return;
     const c = clients.find(x => x.id === activeId);
     if (!confirm(`Rotate token for "${c?.name}"? The old token stops working immediately.`)) return;
-    const r = await fetch(`${BASE}/clients/${activeId}/token`, { method: 'POST', headers: hdrs() });
-    const d = await r.json();
-    if (!r.ok) { alert('Error rotating token'); return; }
+    let d;
+    try { d = await apiFetch(`${BASE}/clients/${activeId}/token`, { method: 'POST' }); }
+    catch (e) { alert('Error rotating token: ' + e.message); return; }
     this.showToken(d.token);
   },
 
@@ -352,10 +374,10 @@ window.athena = {
     $('ms-save').onclick = async () => {
       const p = { name: $('ms-name').value.trim(), abstract: $('ms-abstract').value.trim() };
       if (!p.name) { alert('Name is required.'); return; }
-      const r = await fetch(BASE + '/sequences', { method: 'POST', headers: hdrs(), body: JSON.stringify(p) });
-      if (!r.ok) { alert('Error creating sequence'); return; }
+      try { await apiFetch(BASE + '/sequences', { method: 'POST', body: JSON.stringify(p) }); }
+      catch (e) { alert('Error creating sequence: ' + e.message); return; }
       this.closeModal('athena-modal-seq');
-      sequences = await fetch(BASE + '/sequences', { headers: hdrs() }).then(r => r.json());
+      sequences = await apiFetch(BASE + '/sequences');
       renderSidebar();
     };
     $('athena-modal-seq').classList.add('open');
@@ -378,9 +400,9 @@ window.athena = {
   },
 
   async _refreshShareList() {
-    const r = await fetch(`${BASE}/clients/${shareTarget.id}/shares`, { headers: hdrs() });
-    if (!r.ok) return;
-    const shares = await r.json();
+    let shares;
+    try { shares = await apiFetch(`${BASE}/clients/${shareTarget.id}/shares`); }
+    catch { return; }
     const wrap = $('share-list');
     if (!shares.length) {
       wrap.innerHTML = '<div style="color:var(--atm);font-size:.8em;font-style:italic;padding:8px 0">No shares yet.</div>';
@@ -412,15 +434,8 @@ window.athena = {
     const uid = $('share-search').dataset.selectedUid;
     if (!uid) { alert('Select a user from the search results first.'); return; }
     const canEdit = $('share-can-edit').checked;
-    const r = await fetch(`${BASE}/clients/${shareTarget.id}/shares`, {
-      method: 'POST', headers: hdrs(),
-      body: JSON.stringify({ shareWith: uid, canEdit }),
-    });
-    if (!r.ok) {
-      const d = await r.json().catch(() => ({}));
-      alert(d.message ?? 'Error creating share');
-      return;
-    }
+    try { await apiFetch(`${BASE}/clients/${shareTarget.id}/shares`, { method: 'POST', body: JSON.stringify({ shareWith: uid, canEdit }) }); }
+    catch (e) { alert('Error creating share: ' + e.message); return; }
     $('share-search').value = '';
     delete $('share-search').dataset.selectedUid;
     $('share-can-edit').checked = false;
@@ -429,15 +444,11 @@ window.athena = {
   },
 
   async toggleShareEdit(shareId, canEdit) {
-    await fetch(`${BASE}/clients/${shareTarget.id}/shares/${shareId}`, {
-      method: 'PUT', headers: hdrs(), body: JSON.stringify({ canEdit }),
-    });
+    await apiFetch(`${BASE}/clients/${shareTarget.id}/shares/${shareId}`, { method: 'PUT', body: JSON.stringify({ canEdit }) });
   },
 
   async removeShare(shareId) {
-    await fetch(`${BASE}/clients/${shareTarget.id}/shares/${shareId}`, {
-      method: 'DELETE', headers: hdrs(),
-    });
+    await apiFetch(`${BASE}/clients/${shareTarget.id}/shares/${shareId}`, { method: 'DELETE' });
     await this._refreshShareList();
   },
 };
@@ -456,9 +467,9 @@ function _run() {
     delete $('share-search').dataset.selectedUid;
     if (q.length < 2) { $('share-autocomplete').style.display = 'none'; return; }
     searchDebounce = setTimeout(async () => {
-      const r = await fetch(SEARCH_URL + '?q=' + encodeURIComponent(q), { headers: hdrs() });
-      if (!r.ok) return;
-      const users = await r.json();
+      let users;
+      try { users = await apiFetch(SEARCH_URL + '?q=' + encodeURIComponent(q)); }
+      catch { return; }
       shareSearchResult = users;
       const ac = $('share-autocomplete');
       if (!users.length) { ac.style.display = 'none'; return; }

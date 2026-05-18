@@ -15,8 +15,8 @@ use OCP\DB\Types;
  * @method void   setName(string $name)
  * @method string getTokenHash()
  * @method void   setTokenHash(string $tokenHash)
- * @method int    getSequenceId()
- * @method void   setSequenceId(int $sequenceId)
+ * @method ?int   getSequenceId()
+ * @method void   setSequenceId(?int $sequenceId)
  * @method \DateTime|null getLastHeartbeat()
  * @method void           setLastHeartbeat(\DateTime|null $lastHeartbeat)
  */
@@ -25,7 +25,7 @@ class Client extends Entity {
     protected string $slug = '';
     protected string $name = '';
     protected string $tokenHash = '';
-    protected int $sequenceId = 0;
+    protected ?int $sequenceId = null;
     protected ?\DateTime $lastHeartbeat = null;
 
     public function __construct() {

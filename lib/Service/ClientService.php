@@ -116,7 +116,7 @@ class ClientService {
 
     // ── CRUD ──────────────────────────────────────────────────────────────────
 
-    public function create(string $userId, string $slug, string $name, int $sequenceId): array {
+    public function create(string $userId, string $slug, string $name, ?int $sequenceId): array {
         if (!preg_match('/^[a-z0-9_-]+$/', $slug)) {
             throw new \InvalidArgumentException('Slug may only contain lowercase letters, digits, hyphens and underscores');
         }

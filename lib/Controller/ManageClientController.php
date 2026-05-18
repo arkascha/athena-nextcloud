@@ -38,11 +38,13 @@ class ManageClientController extends Controller {
 
     #[NoAdminRequired]
     #[NoCSRFRequired]
-    public function create(string $slug, string $name, int $sequenceId): DataResponse {
+    public function create(string $slug, string $name, ?int $sequenceId = null): DataResponse {
         if (trim($name) === '') {
             return new DataResponse(['error' => 'Name is required'], Http::STATUS_BAD_REQUEST);
         }
-        $this->sequenceService->findForUser($sequenceId, $this->userId);
+        if ($sequenceId !== null) {
+            $this->sequenceService->findForUser($sequenceId, $this->userId);
+        }
 
         $result = $this->clientService->create($this->userId, $slug, $name, $sequenceId);
         return new DataResponse([
