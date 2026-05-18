@@ -79,6 +79,12 @@ function renderSidebar() {
         <div class="cc-sub">${esc(c.slug)} &middot; ${esc(seq?.name ?? '—')}</div>
       </div>
       <span class="cc-caret">›</span>`;
+    if (c.is_owner) {
+      const del = document.createElement('button');
+      del.className = 'cc-del'; del.title = 'Delete client'; del.textContent = '✕';
+      del.addEventListener('click', e => { e.stopPropagation(); _deleteClient(c); });
+      div.appendChild(del);
+    }
     div.onclick = () => selectClient(c.id);
     el.appendChild(div);
   }
@@ -121,7 +127,7 @@ async function renderMonitor(id) {
   if (client.can_edit) mkBtn('Edit',         'btn btn-ghost btn-sm',  () => window.athena.openEditClient());
   if (client.is_owner) mkBtn('Rotate token', 'btn btn-ghost btn-sm',  () => window.athena.doRotateToken());
   if (client.is_owner) mkBtn('Share',        'btn btn-ghost btn-sm',  () => window.athena.openShare());
-  if (client.is_owner) mkBtn('Delete',       'btn btn-danger btn-sm', () => window.athena.doDeleteClient());
+  if (client.is_owner) mkBtn('Delete',       'btn btn-danger btn-sm', () => _deleteClient(clients.find(x => x.id === activeId) ?? client));
 
   const { stats } = today;
   $('db-stats').innerHTML = `
@@ -298,6 +304,21 @@ async function reloadClients() {
   clients = await apiFetch(BASE + '/clients');
 }
 
+async function _deleteClient(c) {
+  if (!confirm(`Delete "${c.name}"? This cannot be undone.`)) return;
+  try { await apiFetch(`${BASE}/clients/${c.id}`, { method: 'DELETE' }); }
+  catch (e) { alert('Error deleting client: ' + e.message); return; }
+  clearTimeout(refreshTimer);
+  if (activeId === c.id) {
+    activeId = null;
+    $('athena-dashboard').style.display   = 'none';
+    $('athena-placeholder').style.display = '';
+  }
+  await reloadClients();
+  renderSidebar();
+  if (activeId === null && clients.length) await selectClient(clients[0].id);
+}
+
 window.athena = {
   openCreateClient() {
     editingId = null;
@@ -348,15 +369,7 @@ window.athena = {
   async doDeleteClient() {
     if (!activeId) return;
     const c = clients.find(x => x.id === activeId);
-    if (!confirm(`Delete "${c?.name}"? This cannot be undone.`)) return;
-    try { await apiFetch(`${BASE}/clients/${activeId}`, { method: 'DELETE' }); } catch (e) { alert('Error deleting client: ' + e.message); return; }
-    clearTimeout(refreshTimer);
-    await reloadClients();
-    activeId = null;
-    $('athena-dashboard').style.display   = 'none';
-    $('athena-placeholder').style.display = '';
-    renderSidebar();
-    if (clients.length) await selectClient(clients[0].id);
+    if (c) await _deleteClient(c);
   },
 
   async doRotateToken() {

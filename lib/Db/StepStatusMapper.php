@@ -34,6 +34,13 @@ class StepStatusMapper extends QBMapper {
         return $this->findEntities($qb);
     }
 
+    public function deleteByClient(int $clientId): void {
+        $qb = $this->db->getQueryBuilder();
+        $qb->delete($this->getTableName())
+           ->where($qb->expr()->eq('client_id', $qb->createNamedParameter($clientId, IQueryBuilder::PARAM_INT)));
+        $qb->executeStatement();
+    }
+
     /** @return int[] step_ids already tracked for this client+date */
     public function findTrackedStepIds(int $clientId, string $date): array {
         $qb = $this->db->getQueryBuilder();

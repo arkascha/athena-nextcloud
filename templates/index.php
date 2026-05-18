@@ -97,6 +97,13 @@ declare(strict_types=1);
 .cc-name  { font-weight: 500; font-size: .88em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cc-sub   { font-size: .7em; color: var(--atm); font-family: var(--fm); margin-top: 2px; }
 .cc-caret { color: var(--atm); font-size: .8em; opacity: .4; }
+.cc-del {
+  display: none; background: none; border: none; padding: 2px 5px;
+  color: var(--red); font-size: 1em; line-height: 1; border-radius: 4px;
+  flex-shrink: 0; opacity: .7;
+}
+.cc-del:hover { background: var(--red-dim); opacity: 1; }
+.client-card:hover .cc-del { display: block; }
 
 /* ── Heartbeat dot ─────────────────────────────────────────────────────── */
 .hb { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }

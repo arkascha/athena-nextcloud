@@ -15,6 +15,13 @@ class EventMapper extends QBMapper {
         parent::__construct($db, 'athena_events', Event::class);
     }
 
+    public function deleteByClient(int $clientId): void {
+        $qb = $this->db->getQueryBuilder();
+        $qb->delete($this->getTableName())
+           ->where($qb->expr()->eq('client_id', $qb->createNamedParameter($clientId, IQueryBuilder::PARAM_INT)));
+        $qb->executeStatement();
+    }
+
     /**
      * Paginated event list for one client, newest first.
      * @return Event[]

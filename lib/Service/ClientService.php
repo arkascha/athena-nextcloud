@@ -7,6 +7,8 @@ use OCA\Athena\Db\Client;
 use OCA\Athena\Db\ClientMapper;
 use OCA\Athena\Db\ClientShare;
 use OCA\Athena\Db\ClientShareMapper;
+use OCA\Athena\Db\EventMapper;
+use OCA\Athena\Db\StepStatusMapper;
 use OCA\Athena\Exception\ForbiddenException;
 use OCA\Athena\Exception\NotFoundException;
 use OCP\AppFramework\Db\DoesNotExistException;
@@ -15,6 +17,8 @@ class ClientService {
     public function __construct(
         private readonly ClientMapper      $clientMapper,
         private readonly ClientShareMapper $shareMapper,
+        private readonly EventMapper       $eventMapper,
+        private readonly StepStatusMapper  $stepStatusMapper,
     ) {}
 
     // ── Token helpers ────────────────────────────────────────────────────────
@@ -170,7 +174,10 @@ class ClientService {
 
     public function delete(int $id, string $userId): void {
         $client = $this->findOwnedForUser($id, $userId);
-        $this->shareMapper->deleteByClient($client->getId());
+        $cid = $client->getId();
+        $this->eventMapper->deleteByClient($cid);
+        $this->stepStatusMapper->deleteByClient($cid);
+        $this->shareMapper->deleteByClient($cid);
         $this->clientMapper->delete($client);
     }
 
